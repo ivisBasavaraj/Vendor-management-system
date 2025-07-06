@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Layout Guide</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .layout-box { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
+        .logo-area { background-color: #f0f0f0; height: 50px; position: relative; }
+        .logo { position: absolute; border: 2px solid #333; text-align: center; line-height: 46px; font-weight: bold; }
+        .imtma-logo { left: 15px; width: 50px; height: 46px; background-color: #dc3545; color: white; }
+        .biec-logo { left: 145px; width: 50px; height: 46px; background-color: #007bff; color: white; }
+        .content { margin-top: 10px; }
+        .y-pos { color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>PDF Layout Guide - Fixed Logo Overlap</h1>
+    
+    <div class="layout-box">
+        <h3>Logo Area (Y: 15-40)</h3>
+        <div class="logo-area">
+            <div class="logo imtma-logo">IMTMA</div>
+            <div class="logo biec-logo">BIEC</div>
+        </div>
+        <p class="y-pos">Logos: 50x25 pixels, IMTMA at (15,15), BIEC at (145,15)</p>
+    </div>
+    
+    <div class="layout-box">
+        <h3>Content Area (Y: 55+)</h3>
+        <div class="content">
+            <div><strong>Title</strong> <span class="y-pos">(Y: 55)</span></div>
+            <div>Vendor Information <span class="y-pos">(Y: 70-91)</span></div>
+            <div>Document Table <span class="y-pos">(Y: 105+)</span></div>
+            <div>Verification Statement <span class="y-pos">(Dynamic)</span></div>
+            <div>Signature Lines <span class="y-pos">(Dynamic)</span></div>
+        </div>
+    </div>
+    
+    <div class="layout-box">
+        <h3>✅ Problem Fixed:</h3>
+        <ul>
+            <li><strong>Before:</strong> Logos ended at Y=40, Title was at Y=40 → <span style="color: red;">OVERLAP!</span></li>
+            <li><strong>After:</strong> Logos end at Y=40, Title starts at Y=55 → <span style="color: green;">15px GAP!</span></li>
+            <li><strong>Spacing:</strong> All content moved down by 15px for proper spacing</li>
+            <li><strong>Logos:</strong> Bigger (50x25 vs 30x15) and swapped positions</li>
+        </ul>
+    </div>
+    
+    <div class="layout-box">
+        <h3>🎯 Expected Result:</h3>
+        <ul>
+            <li>IMTMA logo (red) on the LEFT corner - bigger and clear</li>
+            <li>BIEC logo (blue) on the RIGHT corner - bigger and clear</li>
+            <li>NO text overlap with logos</li>
+            <li>Clean, professional layout with proper spacing</li>
+        </ul>
+    </div>
+</body>
+</html>

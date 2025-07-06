@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Compliance Report - IMTMA VMS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .report-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #007bff;
+        }
+        .logo-placeholder {
+            width: 80px;
+            height: 40px;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .title-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .main-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        .report-id {
+            font-size: 12px;
+            color: #007bff;
+            font-weight: 600;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        .info-table th {
+            background-color: #f8f9fa;
+            color: #495057;
+            font-weight: 600;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #dee2e6;
+            width: 35%;
+        }
+        .info-table td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 30px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #007bff;
+        }
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .documents-table th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid #0056b3;
+        }
+        .documents-table td {
+            padding: 10px 8px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            vertical-align: top;
+        }
+        .documents-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .documents-table tr:hover {
+            background-color: #e3f2fd;
+        }
+        .status-verified {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .summary-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #28a745;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .certification {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #c3e6cb;
+            margin-bottom: 30px;
+        }
+        .signature-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 40px;
+        }
+        .signature-box {
+            text-align: center;
+        }
+        .signature-line {
+            border-bottom: 2px solid #333;
+            margin-bottom: 8px;
+            height: 40px;
+        }
+        .signature-label {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 600;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .compliance-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        @media print {
+            body { background: white; }
+            .report-container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header with Logos -->
+        <div class="header">
+            <div class="logo-placeholder">IMTMA</div>
+            <div class="logo-placeholder">BIEC</div>
+        </div>
+
+        <!-- Title Section -->
+        <div class="title-section">
+            <h1 class="main-title">Compliance Verification Report</h1>
+            <p class="subtitle">Generated on <span id="current-date"></span> at <span id="current-time"></span></p>
+            <p class="report-id">Report ID: CVR-20241201-ABC123</p>
+        </div>
+
+        <!-- Vendor Information -->
+        <h2 class="section-title">Vendor Information</h2>
+        <table class="info-table">
+            <tr>
+                <th>Vendor Name</th>
+                <td>ABC Construction Services Pvt. Ltd.</td>
+            </tr>
+            <tr>
+                <th>Company/Organization</th>
+                <td>ABC Construction Services Pvt. Ltd.</td>
+            </tr>
+            <tr>
+                <th>Contact Email</th>
+                <td>contact@abcconstruction.com</td>
+            </tr>
+            <tr>
+                <th>Address</th>
+                <td>123 Industrial Area, Sector 45, Bangalore - 560078</td>
+            </tr>
+            <tr>
+                <th>Work Location</th>
+                <td>BIEC Exhibition Center, Bangalore</td>
+            </tr>
+            <tr>
+                <th>Agreement Period</th>
+                <td>January 2024 - December 2024</td>
+            </tr>
+            <tr>
+                <th>Verification Period</th>
+                <td>November 2024</td>
+            </tr>
+            <tr>
+                <th>Compliance Status</th>
+                <td><span class="compliance-badge">✓ FULLY COMPLIANT</span></td>
+            </tr>
+        </table>
+
+        <!-- Documents Verification Checklist -->
+        <h2 class="section-title">Documents Verification Checklist</h2>
+        <p style="font-style: italic; color: #6c757d; margin-bottom: 15px;">
+            Documents verified for the period: November 2024
+        </p>
+
+        <table class="documents-table">
+            <thead>
+                <tr>
+                    <th style="width: 8%;">S.No</th>
+                    <th style="width: 50%;">Document Particulars</th>
+                    <th style="width: 20%;">Verification Status</th>
+                    <th style="width: 22%;">Compliance Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>01</td>
+                    <td style="text-align: left;">Form T - Combined Muster Roll Cum Register of Wages</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Compliant with Labour Laws</td>
+                </tr>
+                <tr>
+                    <td>02</td>
+                    <td style="text-align: left;">Bank Statement - Salary Account</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">All transactions verified</td>
+                </tr>
+                <tr>
+                    <td>03</td>
+                    <td style="text-align: left;">Electronic Challan Cum Return (ECR) - Previous Month</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">EPF compliance confirmed</td>
+                </tr>
+                <tr>
+                    <td>04</td>
+                    <td style="text-align: left;">Combined Challan A/C NO. 01, 02, 10, 21 & 22 (EPFO)</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Payment records verified</td>
+                </tr>
+                <tr>
+                    <td>05</td>
+                    <td style="text-align: left;">Provident Fund TRRN Details</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Reference numbers validated</td>
+                </tr>
+                <tr>
+                    <td>06</td>
+                    <td style="text-align: left;">ESIC Contribution History Statements</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Medical insurance compliance</td>
+                </tr>
+                <tr>
+                    <td>07</td>
+                    <td style="text-align: left;">ESIC Challan - Monthly Contribution</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Payment confirmation received</td>
+                </tr>
+                <tr>
+                    <td>08</td>
+                    <td style="text-align: left;">Professional Tax Returns Form 5A</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">State tax compliance verified</td>
+                </tr>
+                <tr>
+                    <td>09</td>
+                    <td style="text-align: left;">Labour License & Registration Certificates</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Valid licenses confirmed</td>
+                </tr>
+                <tr>
+                    <td>10</td>
+                    <td style="text-align: left;">Safety & Compliance Certificates</td>
+                    <td><span class="status-verified">VERIFIED</span></td>
+                    <td style="text-align: left;">Workplace safety standards met</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Compliance Summary -->
+        <h2 class="section-title">Compliance Summary</h2>
+        <div class="summary-section">
+            <div class="summary-stats">
+                <div class="stat-item">
+                    <div class="stat-number">10</div>
+                    <div class="stat-label">Total Documents</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">10</div>
+                    <div class="stat-label">Documents Verified</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Compliance Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #28a745;">✓</div>
+                    <div class="stat-label">Overall Status</div>
+                </div>
+            </div>
+            <p style="margin: 0; font-weight: 600; color: #28a745;">
+                ✓ Overall Status: FULLY COMPLIANT
+            </p>
+        </div>
+
+        <!-- Certification -->
+        <h2 class="section-title">Certification</h2>
+        <div class="certification">
+            <p>
+                This is to certify that the above-mentioned vendor has submitted all required documents for the period of 
+                <strong>November 2024</strong>. All documents have been thoroughly reviewed and verified for compliance 
+                with applicable regulations, labour laws, and contractual obligations.
+            </p>
+            <p style="margin-bottom: 0;">
+                The vendor has demonstrated full compliance with all regulatory requirements and maintains proper 
+                documentation standards as per the agreement terms.
+            </p>
+        </div>
+
+        <!-- Signature Section -->
+        <div class="signature-section">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-label">
+                    <strong>System Consultant</strong><br>
+                    Compliance Auditor<br>
+                    Date: <span id="signature-date"></span>
+                </div>
+            </div>
+            <div class="signature-box">
+                <div style="border: 2px solid #333; height: 60px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d;">
+                    (Official Seal)
+                </div>
+                <div class="signature-label">
+                    <strong>Organization Seal</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>This is a computer-generated compliance verification report.</p>
+            <p>Generated on <span id="footer-date"></span> | Report ID: CVR-20241201-ABC123</p>
+        </div>
+    </div>
+
+    <script>
+        // Set current date and time
+        const now = new Date();
+        const dateOptions = { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        const timeOptions = { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        };
+        
+        const currentDate = now.toLocaleDateString('en-US', dateOptions);
+        const currentTime = now.toLocaleTimeString('en-US', timeOptions);
+        
+        document.getElementById('current-date').textContent = currentDate;
+        document.getElementById('current-time').textContent = currentTime;
+        document.getElementById('signature-date').textContent = currentDate;
+        document.getElementById('footer-date').textContent = currentDate + ' at ' + currentTime;
+    </script>
+</body>
+</html>

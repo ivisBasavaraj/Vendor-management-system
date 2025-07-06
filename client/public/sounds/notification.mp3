@@ -1,0 +1,3 @@
+# This is a placeholder for the notification sound file
+# In a real implementation, you would place actual MP3 files here
+# For now, we'll use the Web Audio API to generate sounds programmatically
