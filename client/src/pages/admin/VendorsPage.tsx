@@ -56,7 +56,7 @@ const mockVendors = [
     status: 'active',
     documentsCount: 12,
     lastActivity: '2023-06-15',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/0976ce/ffffff?text=ABC',
     location: 'Mumbai, India',
     industry: 'Manufacturing'
   },
@@ -68,7 +68,7 @@ const mockVendors = [
     status: 'active',
     documentsCount: 8,
     lastActivity: '2023-06-14',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/7c3aed/ffffff?text=XYZ',
     location: 'Delhi, India',
     industry: 'Electronics'
   },
@@ -80,7 +80,7 @@ const mockVendors = [
     status: 'inactive',
     documentsCount: 5,
     lastActivity: '2023-05-30',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/16a34a/ffffff?text=GL',
     location: 'Bangalore, India',
     industry: 'Logistics'
   },
@@ -92,7 +92,7 @@ const mockVendors = [
     status: 'active',
     documentsCount: 15,
     lastActivity: '2023-06-12',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/dc2626/ffffff?text=TS',
     location: 'Chennai, India',
     industry: 'IT Services'
   },
@@ -104,7 +104,7 @@ const mockVendors = [
     status: 'pending',
     documentsCount: 3,
     lastActivity: '2023-06-10',
-    logo: null,
+    logo: null, // Keep some without logos to test fallback
     location: 'Hyderabad, India',
     industry: 'Industrial'
   },
@@ -116,7 +116,7 @@ const mockVendors = [
     status: 'active',
     documentsCount: 9,
     lastActivity: '2023-06-08',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/6b7280/ffffff?text=PT',
     location: 'Pune, India',
     industry: 'Manufacturing'
   },
@@ -128,7 +128,7 @@ const mockVendors = [
     status: 'active',
     documentsCount: 7,
     lastActivity: '2023-06-07',
-    logo: null,
+    logo: null, // Keep some without logos to test fallback
     location: 'Kolkata, India',
     industry: 'Logistics'
   },
@@ -140,7 +140,7 @@ const mockVendors = [
     status: 'inactive',
     documentsCount: 4,
     lastActivity: '2023-06-05',
-    logo: null,
+    logo: 'https://via.placeholder.com/100x100/f59e0b/ffffff?text=SE',
     location: 'Ahmedabad, India',
     industry: 'Electronics'
   },
@@ -155,6 +155,7 @@ const VendorsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchVendors();
@@ -276,6 +277,52 @@ const VendorsPage: React.FC = () => {
     return colors[index];
   };
 
+  const handleLogoError = (vendorId: string) => {
+    setLogoErrors(prev => new Set(prev).add(vendorId));
+  };
+
+  const VendorLogo: React.FC<{ 
+    vendor: any; 
+    size: 'small' | 'large'; 
+    className?: string;
+  }> = ({ vendor, size, className = '' }) => {
+    const vendorId = vendor._id || vendor.id;
+    const hasLogoError = logoErrors.has(vendorId);
+    const logoUrl = vendor.logo;
+    
+    // Size classes
+    const sizeClasses = size === 'small' 
+      ? 'h-10 w-10 text-sm' 
+      : 'h-16 w-16 text-xl';
+    
+    // If no logo URL or logo failed to load, show initials
+    if (!logoUrl || hasLogoError) {
+      return (
+        <div className={`${sizeClasses} rounded-full flex items-center justify-center text-white font-bold ${getRandomColor(vendorId)} ${className}`}>
+          {getInitials(vendor.name)}
+        </div>
+      );
+    }
+    
+    // Show logo image
+    return (
+      <img 
+        src={logoUrl} 
+        alt={vendor.name || 'Vendor Logo'} 
+        className={`${sizeClasses} ${size === 'small' ? 'rounded-full' : 'object-contain'} ${className}`}
+        onError={() => handleLogoError(vendorId)}
+        onLoad={() => {
+          // Remove from error set if image loads successfully
+          setLogoErrors(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(vendorId);
+            return newSet;
+          });
+        }}
+      />
+    );
+  };
+
   return (
     <MainLayout>
       <div className="p-6">
@@ -348,17 +395,7 @@ const VendorsPage: React.FC = () => {
                       hover
                     >
                       <div className="h-24 bg-gradient-to-r from-primary-500 to-primary-700 flex items-center justify-center">
-                        {vendor.logo ? (
-                          <img 
-                            src={vendor.logo} 
-                            alt={vendor.name} 
-                            className="h-16 w-16 object-contain"
-                          />
-                        ) : (
-                          <div className={`h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold ${getRandomColor(vendor.id)}`}>
-                            {getInitials(vendor.name)}
-                          </div>
-                        )}
+                        <VendorLogo vendor={vendor} size="large" />
                       </div>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-2">
@@ -485,17 +522,7 @@ const VendorsPage: React.FC = () => {
                           <tr key={vendor._id || vendor.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-750">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
-                                {vendor.logo ? (
-                                  <img 
-                                    src={vendor.logo} 
-                                    alt={vendor.name} 
-                                    className="h-10 w-10 rounded-full"
-                                  />
-                                ) : (
-                                  <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getRandomColor(vendor.id)}`}>
-                                    {getInitials(vendor.name)}
-                                  </div>
-                                )}
+                                <VendorLogo vendor={vendor} size="small" />
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-neutral-900 dark:text-white">
                                     {vendor.name || 'N/A'}

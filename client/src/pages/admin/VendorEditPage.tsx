@@ -46,6 +46,7 @@ interface VendorFormData {
   workLocation: string;
   agreementPeriod: string;
   companyRegNo: string;
+  logo?: string;
 }
 
 interface Consultant {
@@ -84,6 +85,9 @@ const VendorEditPage: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Partial<VendorFormData>>({});
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   useEffect(() => {
     if (id) {

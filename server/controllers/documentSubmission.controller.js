@@ -994,7 +994,10 @@ exports.getAllSubmissions = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .populate('vendor', 'name email company')
-      .populate('consultant', 'name email');
+      .populate('consultant', 'name email')
+      .populate('consultantApproval.approvedBy', 'name email')
+      .populate('finalApproval.approvedBy', 'name email')
+      .populate('documents.reviewedBy', 'name email');
 
     // Get total count
     const total = await DocumentSubmission.countDocuments(query);

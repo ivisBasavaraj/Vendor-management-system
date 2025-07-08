@@ -1245,21 +1245,25 @@ exports.getVendorAnalytics = async (req, res) => {
 // Get dashboard analytics and overview
 exports.getDashboardAnalytics = async (req, res) => {
   try {
+    // Import DocumentSubmission model
+    const DocumentSubmission = require('../models/documentSubmission.model');
+    
     // Get counts
     const totalVendors = await User.countDocuments({ role: 'vendor' });
     const totalConsultants = await User.countDocuments({ role: 'consultant' });
     const totalDocuments = await DocModel.countDocuments();
+    const totalSubmissions = await DocumentSubmission.countDocuments();
     const activeUsers = await User.countDocuments({ isActive: true });
     const pendingApprovals = await User.countDocuments({ 
       role: 'vendor', 
       requiresLoginApproval: true 
     });
     
-    // Get document stats by status
-    const documentsByStatus = await DocModel.aggregate([
+    // Get submission stats by status
+    const documentsByStatus = await DocumentSubmission.aggregate([
       {
         $group: {
-          _id: '$status',
+          _id: '$submissionStatus',
           count: { $sum: 1 }
         }
       },
@@ -1268,10 +1272,12 @@ exports.getDashboardAnalytics = async (req, res) => {
           name: {
             $switch: {
               branches: [
-                { case: { $eq: ['$_id', 'pending'] }, then: 'Pending' },
+                { case: { $eq: ['$_id', 'draft'] }, then: 'Draft' },
+                { case: { $eq: ['$_id', 'submitted'] }, then: 'Submitted' },
                 { case: { $eq: ['$_id', 'under_review'] }, then: 'Under Review' },
-                { case: { $eq: ['$_id', 'approved'] }, then: 'Approved' },
-                { case: { $eq: ['$_id', 'rejected'] }, then: 'Rejected' }
+                { case: { $eq: ['$_id', 'partially_approved'] }, then: 'Partially Approved' },
+                { case: { $eq: ['$_id', 'fully_approved'] }, then: 'Fully Approved' },
+                { case: { $eq: ['$_id', 'requires_resubmission'] }, then: 'Requires Resubmission' }
               ],
               default: 'Unknown'
             }
@@ -1281,11 +1287,11 @@ exports.getDashboardAnalytics = async (req, res) => {
       }
     ]);
     
-    // Get documents by month (last 6 months)
+    // Get submissions by month (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
-    const documentsByMonth = await DocModel.aggregate([
+    const documentsByMonth = await DocumentSubmission.aggregate([
       {
         $match: {
           createdAt: { $gte: sixMonthsAgo }
@@ -1391,6 +1397,7 @@ exports.getDashboardAnalytics = async (req, res) => {
         totalVendors,
         totalConsultants,
         totalDocuments,
+        totalSubmissions,
         activeUsers,
         pendingApprovals,
         documentsByStatus,

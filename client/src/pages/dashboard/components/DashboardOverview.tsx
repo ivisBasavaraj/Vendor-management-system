@@ -20,7 +20,7 @@ interface DashboardStatsProps {
   stats: {
     totalVendors: number;
     totalConsultants: number;
-    totalDocuments: number;
+    totalSubmissions: number;
     activeUsers: number;
     pendingApprovals: number;
     documentsByStatus: Array<{ name: string; value: number; }>;
@@ -147,7 +147,7 @@ const DashboardOverview: React.FC<DashboardStatsProps> = ({ stats }) => {
         </motion.div>
 
         <motion.div variants={fadeInUp}>
-          <Link to="/documents" className="block">
+          <Link to="/admin/status" className="block">
             <Card className="p-6 h-full transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -155,10 +155,10 @@ const DashboardOverview: React.FC<DashboardStatsProps> = ({ stats }) => {
                     <DocumentTextIcon className="h-6 w-6" />
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Documents</h3>
+                    <h3 className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Total Submissions</h3>
                     <div className="mt-1 flex items-baseline">
                       <p className="text-2xl font-semibold text-neutral-900 dark:text-white">
-                        {stats.totalDocuments}
+                        {stats.totalSubmissions}
                       </p>
                     </div>
                   </div>
@@ -182,7 +182,7 @@ const DashboardOverview: React.FC<DashboardStatsProps> = ({ stats }) => {
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-6 text-neutral-900 dark:text-white flex items-center">
               <ChartBarIcon className="mr-2 h-5 w-5 text-neutral-500" />
-              Document Status
+              Document Submission Status
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -213,7 +213,7 @@ const DashboardOverview: React.FC<DashboardStatsProps> = ({ stats }) => {
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-6 text-neutral-900 dark:text-white flex items-center">
               <ChartBarIcon className="mr-2 h-5 w-5 text-neutral-500" />
-              Documents by Month
+              Document Submission by Month
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">

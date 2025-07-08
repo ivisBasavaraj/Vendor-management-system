@@ -34,8 +34,6 @@ import { FontAwesomeIcon } from '../../utils/icons';
 import { 
   faSearch, 
   faFilter,
-  faEye,
-  faDownload,
   faCalendarAlt,
   faFileAlt,
   faUsers,
@@ -74,46 +72,40 @@ const ModernTableContainer = styled(TableContainer)(({ theme }) => ({
   backdropFilter: 'blur(10px)',
 }));
 
-// Transform submission data to vendor-centric month-wise view
+// Transform submission data to show month-wise submissions for each vendor
 const transformSubmissionData = (submissions: any[]) => {
-  const vendorMap = new Map();
+  const transformedData: any[] = [];
   
   submissions.forEach((submission: any) => {
-    // Get vendor information
+    // Get vendor information from populated field
     const vendorName = submission.vendor?.name || submission.vendor?.company || 'Unknown Vendor';
-    const vendorId = submission.vendor?._id || submission.vendor?.id || 'unknown';
-    const consultantName = submission.consultant?.name || submission.consultant?.email || 'Unassigned';
-    const month = submission.uploadPeriod?.month || 'N/A';
-    const year = submission.uploadPeriod?.year || new Date().getFullYear();
-    const monthYear = `${month} ${year}`;
     
-    // Create vendor key
-    const vendorKey = `${vendorId}_${vendorName}`;
-    
-    if (!vendorMap.has(vendorKey)) {
-      vendorMap.set(vendorKey, {
-        vendorId: vendorId,
-        vendorName: vendorName,
-        consultant: consultantName,
-        submissions: new Map()
-      });
+    // Get consultant information - prioritize the one who approved
+    let consultantName = 'Unassigned';
+    if (submission.consultantApproval?.approvedBy) {
+      // If there's an approval, try to get the approver's name
+      consultantName = submission.consultantApproval.approvedBy.name || submission.consultant?.name || 'Consultant';
+    } else {
+      // Otherwise use the assigned consultant
+      consultantName = submission.consultant?.name || 'Unassigned';
     }
     
-    const vendor = vendorMap.get(vendorKey);
+    // Get month and year from uploadPeriod
+    const month = submission.uploadPeriod?.month || 'N/A';
+    const year = submission.uploadPeriod?.year || new Date().getFullYear();
     
-    // Calculate submission status
-    let overallStatus = submission.submissionStatus || 'draft';
+    // Calculate submission statistics
     let totalDocuments = 0;
     let approvedDocuments = 0;
     let rejectedDocuments = 0;
     let pendingDocuments = 0;
+    let overallStatus = submission.submissionStatus || 'draft';
     
     if (submission.documents && Array.isArray(submission.documents)) {
       totalDocuments = submission.documents.length;
       submission.documents.forEach((doc: any) => {
         switch (doc.status) {
           case 'approved':
-          case 'fully_approved':
             approvedDocuments++;
             break;
           case 'rejected':
@@ -124,11 +116,16 @@ const transformSubmissionData = (submissions: any[]) => {
         }
       });
       
-      // Determine overall status based on document statuses
+      // Determine overall status based on document statuses and consultant approval
       if (rejectedDocuments > 0) {
         overallStatus = 'requires_resubmission';
       } else if (approvedDocuments === totalDocuments && totalDocuments > 0) {
-        overallStatus = 'fully_approved';
+        // Check if consultant has given final approval
+        if (submission.consultantApproval?.isApproved) {
+          overallStatus = 'fully_approved';
+        } else {
+          overallStatus = 'partially_approved';
+        }
       } else if (approvedDocuments > 0) {
         overallStatus = 'partially_approved';
       } else if (pendingDocuments > 0) {
@@ -136,7 +133,7 @@ const transformSubmissionData = (submissions: any[]) => {
       }
     }
     
-    // Format dates
+    // Format the submitted date with time
     const submittedDate = submission.submissionDate 
       ? new Date(submission.submissionDate).toLocaleString('en-US', {
           year: 'numeric',
@@ -144,6 +141,7 @@ const transformSubmissionData = (submissions: any[]) => {
           day: '2-digit',
           hour: '2-digit',
           minute: '2-digit',
+          second: '2-digit',
           hour12: false
         })
       : (submission.createdAt 
@@ -153,35 +151,70 @@ const transformSubmissionData = (submissions: any[]) => {
               day: '2-digit',
               hour: '2-digit',
               minute: '2-digit',
+              second: '2-digit',
               hour12: false
             })
           : 'N/A');
     
-    const approvedDate = submission.consultantApproval?.approvalDate
-      ? new Date(submission.consultantApproval.approvalDate).toLocaleString('en-US', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        })
-      : 'N/A';
+    // Format the approved date if available (prioritize consultant approval)
+    let approvedDate = 'N/A';
     
-    // Add submission to vendor's submissions map
-    vendor.submissions.set(monthYear, {
+    // Check for consultant approval date first
+    if (submission.consultantApproval?.approvalDate) {
+      approvedDate = new Date(submission.consultantApproval.approvalDate).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    }
+    // If no consultant approval, check for final approval
+    else if (submission.finalApproval?.approvalDate) {
+      approvedDate = new Date(submission.finalApproval.approvalDate).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    }
+    // Check individual document review dates as fallback
+    else if (submission.documents && Array.isArray(submission.documents)) {
+      const approvedDocs = submission.documents.filter((doc: any) => doc.status === 'approved' && doc.reviewDate);
+      if (approvedDocs.length > 0) {
+        // Use the latest review date
+        const latestReviewDate = approvedDocs.reduce((latest: Date, doc: any) => {
+          const docDate = new Date(doc.reviewDate);
+          return docDate > latest ? docDate : latest;
+        }, new Date(0));
+        
+        if (latestReviewDate.getTime() > 0) {
+          approvedDate = latestReviewDate.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
+        }
+      }
+    }
+    
+    transformedData.push({
       id: submission._id,
       submissionId: submission._id,
-      month: month,
-      year: year,
-      monthYear: monthYear,
-      status: overallStatus,
+      vendorName: vendorName,
+      documentType: `${totalDocuments} Documents`,
       submittedDate: submittedDate,
-      approvedDate: approvedDate,
-      totalDocuments: totalDocuments,
-      approvedDocuments: approvedDocuments,
-      rejectedDocuments: rejectedDocuments,
-      pendingDocuments: pendingDocuments,
+      status: overallStatus,
+      consultant: consultantName,
       lastUpdated: submission.lastModifiedDate 
         ? new Date(submission.lastModifiedDate).toLocaleString('en-US', {
             year: 'numeric',
@@ -189,41 +222,25 @@ const transformSubmissionData = (submissions: any[]) => {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
             hour12: false
           })
         : submittedDate,
-      reviewNotes: submission.consultantApproval?.remarks || ''
+      approvedDate: approvedDate,
+      month: month,
+      year: year,
+      totalDocuments: totalDocuments,
+      approvedDocuments: approvedDocuments,
+      rejectedDocuments: rejectedDocuments,
+      pendingDocuments: pendingDocuments,
+      reviewNotes: submission.consultantApproval?.remarks || '',
+      approvedBy: submission.consultantApproval?.approvedBy?.name || '',
+      isConsultantApproved: submission.consultantApproval?.isApproved || false,
+      isFinalApproved: submission.finalApproval?.isApproved || false
     });
   });
   
-  // Convert to array format for table display
-  const transformedData: any[] = [];
-  
-  vendorMap.forEach((vendor) => {
-    vendor.submissions.forEach((submission: any) => {
-      transformedData.push({
-        id: `${vendor.vendorId}_${submission.monthYear}`,
-        vendorId: vendor.vendorId,
-        vendorName: vendor.vendorName,
-        consultant: vendor.consultant,
-        month: submission.month,
-        year: submission.year,
-        monthYear: submission.monthYear,
-        status: submission.status,
-        submittedDate: submission.submittedDate,
-        approvedDate: submission.approvedDate,
-        totalDocuments: submission.totalDocuments,
-        approvedDocuments: submission.approvedDocuments,
-        rejectedDocuments: submission.rejectedDocuments,
-        pendingDocuments: submission.pendingDocuments,
-        lastUpdated: submission.lastUpdated,
-        reviewNotes: submission.reviewNotes,
-        submissionId: submission.submissionId
-      });
-    });
-  });
-  
-  return transformedData.sort((a, b) => {
+  const sortedData = transformedData.sort((a, b) => {
     // Sort by vendor name first, then by year and month
     if (a.vendorName !== b.vendorName) {
       return a.vendorName.localeCompare(b.vendorName);
@@ -235,6 +252,15 @@ const transformSubmissionData = (submissions: any[]) => {
     const monthOrder = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
     return monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month);
   });
+
+  console.log('Transformed and sorted data:', sortedData.map(d => ({
+    vendor: d.vendorName,
+    month: d.month,
+    year: d.year,
+    status: d.status
+  })));
+
+  return sortedData;
 };
 
 // Helper function to get readable document type names
@@ -294,23 +320,39 @@ const StatusPage: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [yearFilter, setYearFilter] = useState('2025');
+  const [yearFilter, setYearFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('all');
+
+  // Function to refresh data
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      console.log('Refreshing submissions data');
+      const apiParams = { limit: 1000 };
+      const response = await apiService.documents.getAllSubmissions(apiParams);
+      
+      if (response.data.success && response.data.data) {
+        const transformedData = transformSubmissionData(response.data.data);
+        setDocuments(transformedData);
+      } else {
+        setDocuments([]);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setLoading(false);
+      setDocuments([]);
+    }
+  };
 
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        // Use the API service to fetch real document submission data
-        const params = {
-          year: yearFilter !== 'all' ? yearFilter : undefined,
-          month: monthFilter !== 'all' ? monthFilter : undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined
-        };
-        
-        console.log('Fetching submissions with params:', params);
-        // Add limit parameter to get more data
-        const apiParams = { ...params, limit: 100 };
+        // Use the API service to fetch all document submission data (no backend filtering)
+        console.log('Fetching all submissions for admin filtering');
+        // Get all submissions with a high limit for admin filtering
+        const apiParams = { limit: 1000 };
         const response = await apiService.documents.getAllSubmissions(apiParams);
         console.log('API Response:', response.data);
         
@@ -335,7 +377,7 @@ const StatusPage: React.FC = () => {
     };
 
     fetchDocuments();
-  }, [yearFilter, monthFilter, statusFilter]);
+  }, []); // Only fetch once on component mount
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -375,14 +417,85 @@ const StatusPage: React.FC = () => {
     // Status filter
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
     
-    // Year filter - use the year field directly from the transformed data
-    const matchesYear = yearFilter === 'all' || doc.year?.toString() === yearFilter;
+    // Year filter - convert both to string for comparison
+    const docYear = doc.year?.toString() || '';
+    const matchesYear = yearFilter === 'all' || docYear === yearFilter;
     
-    // Month filter - use the month field directly from the transformed data
-    const matchesMonth = monthFilter === 'all' || doc.month === monthFilter;
+    // Month filter - exact match on month abbreviation
+    const docMonth = doc.month || '';
+    const matchesMonth = monthFilter === 'all' || docMonth === monthFilter;
+    
+    // Debug logging for filtering
+    if (searchTerm || statusFilter !== 'all' || yearFilter !== 'all' || monthFilter !== 'all') {
+      console.log('Filtering doc:', {
+        vendorName: doc.vendorName,
+        year: docYear,
+        month: docMonth,
+        status: doc.status,
+        matchesSearch,
+        matchesStatus,
+        matchesYear,
+        matchesMonth,
+        filters: { searchTerm, statusFilter, yearFilter, monthFilter }
+      });
+    }
     
     return matchesSearch && matchesStatus && matchesYear && matchesMonth;
   });
+
+  // Get unique years from the data for the year filter
+  const availableYears = React.useMemo(() => {
+    const dataYears = Array.from(new Set(documents.map(doc => doc.year).filter(year => year)));
+    
+    // If we have data years, use them, otherwise generate a range
+    if (dataYears.length > 0) {
+      const minYear = Math.min(...dataYears);
+      const maxYear = Math.max(...dataYears);
+      const currentYear = new Date().getFullYear();
+      
+      // Generate a range from 2 years before the minimum data year to 2035
+      const startYear = Math.min(minYear - 2, currentYear - 5);
+      const endYear = Math.max(maxYear + 2, 2035);
+      
+      const allYears = [];
+      for (let year = endYear; year >= startYear; year--) {
+        allYears.push(year);
+      }
+      return allYears;
+    } else {
+      // Fallback: generate years from 2020 to 2035
+      const years = [];
+      for (let year = 2035; year >= 2020; year--) {
+        years.push(year);
+      }
+      return years;
+    }
+  }, [documents]);
+
+  // Get unique months from the data for the month filter
+  const availableMonths = React.useMemo(() => {
+    const months = Array.from(new Set(documents.map(doc => doc.month).filter(month => month)));
+    const monthOrder = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+    return months.sort((a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b));
+  }, [documents]);
+
+  // Get unique statuses from the data for the status filter
+  const availableStatuses = React.useMemo(() => {
+    const statuses = Array.from(new Set(documents.map(doc => doc.status).filter(status => status)));
+    // Define preferred order for statuses
+    const statusOrder = [
+      'draft', 'submitted', 'uploaded', 'under_review', 'partially_approved', 
+      'fully_approved', 'requires_resubmission', 'rejected', 'resubmitted'
+    ];
+    return statuses.sort((a, b) => {
+      const aIndex = statusOrder.indexOf(a);
+      const bIndex = statusOrder.indexOf(b);
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }, [documents]);
 
   const getStatusLabel = (status: string) => {
     if (!status) return 'Unknown';
@@ -492,7 +605,8 @@ const StatusPage: React.FC = () => {
             <Stack direction="row" spacing={2}>
               <Tooltip title="Refresh Data">
                 <IconButton 
-                  onClick={() => window.location.reload()}
+                  onClick={refreshData}
+                  disabled={loading}
                   sx={{ 
                     bgcolor: 'rgba(255, 255, 255, 0.9)',
                     '&:hover': { bgcolor: 'white' }
@@ -564,6 +678,9 @@ const StatusPage: React.FC = () => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
                       Approved Submissions
+                    </Typography>
+                    <Typography variant="caption" color="success.main" sx={{ fontSize: '0.75rem' }}>
+                      ({filteredDocuments.filter(d => d.isConsultantApproved).length} by Consultant)
                     </Typography>
                   </Box>
                   <Avatar
@@ -693,13 +810,11 @@ const StatusPage: React.FC = () => {
                     }}
                   >
                     <MenuItem value="all">All Status</MenuItem>
-                    <MenuItem value="draft">Draft</MenuItem>
-                    <MenuItem value="submitted">Submitted</MenuItem>
-                    <MenuItem value="under_review">Under Review</MenuItem>
-                    <MenuItem value="partially_approved">Partially Approved</MenuItem>
-                    <MenuItem value="fully_approved">Fully Approved</MenuItem>
-                    <MenuItem value="requires_resubmission">Requires Resubmission</MenuItem>
-                    <MenuItem value="rejected">Rejected</MenuItem>
+                    {availableStatuses.map(status => (
+                      <MenuItem key={status} value={status}>
+                        {getStatusLabel(status)}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Box>
@@ -721,9 +836,11 @@ const StatusPage: React.FC = () => {
                     }}
                   >
                     <MenuItem value="all">All Years</MenuItem>
-                    <MenuItem value="2025">2025</MenuItem>
-                    <MenuItem value="2024">2024</MenuItem>
-                    <MenuItem value="2023">2023</MenuItem>
+                    {availableYears.map(year => (
+                      <MenuItem key={year} value={year.toString()}>
+                        {year}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Box>
@@ -745,18 +862,18 @@ const StatusPage: React.FC = () => {
                     }}
                   >
                     <MenuItem value="all">All Months</MenuItem>
-                    <MenuItem value="Apr">April</MenuItem>
-                    <MenuItem value="May">May</MenuItem>
-                    <MenuItem value="Jun">June</MenuItem>
-                    <MenuItem value="Jul">July</MenuItem>
-                    <MenuItem value="Aug">August</MenuItem>
-                    <MenuItem value="Sep">September</MenuItem>
-                    <MenuItem value="Oct">October</MenuItem>
-                    <MenuItem value="Nov">November</MenuItem>
-                    <MenuItem value="Dec">December</MenuItem>
-                    <MenuItem value="Jan">January</MenuItem>
-                    <MenuItem value="Feb">February</MenuItem>
-                    <MenuItem value="Mar">March</MenuItem>
+                    {availableMonths.map(month => {
+                      const monthNames: { [key: string]: string } = {
+                        'Apr': 'April', 'May': 'May', 'Jun': 'June', 'Jul': 'July',
+                        'Aug': 'August', 'Sep': 'September', 'Oct': 'October', 'Nov': 'November',
+                        'Dec': 'December', 'Jan': 'January', 'Feb': 'February', 'Mar': 'March'
+                      };
+                      return (
+                        <MenuItem key={month} value={month}>
+                          {monthNames[month] || month}
+                        </MenuItem>
+                      );
+                    })}
                   </Select>
                 </FormControl>
               </Box>
@@ -765,7 +882,14 @@ const StatusPage: React.FC = () => {
                   variant="outlined" 
                   fullWidth
                   size="small"
-                  startIcon={<FontAwesomeIcon icon={faFilter} />}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setYearFilter('all');
+                    setMonthFilter('all');
+                    setPage(0);
+                  }}
+                  startIcon={<FontAwesomeIcon icon={faTimesCircle} />}
                   sx={{
                     borderRadius: '12px',
                     borderColor: '#667eea',
@@ -778,7 +902,7 @@ const StatusPage: React.FC = () => {
                     }
                   }}
                 >
-                  Filter
+                  Clear Filters
                 </Button>
               </Box>
             </Box>
@@ -801,11 +925,10 @@ const StatusPage: React.FC = () => {
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Vendor Name</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Month & Year</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Documents Status</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Submission Status</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Submitted Date & Time</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Status</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Consultant</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Approved Date</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -830,13 +953,13 @@ const StatusPage: React.FC = () => {
                               </Typography>
                             </TableCell>
                             <TableCell sx={{ py: 2.5 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                {doc.monthYear || 'N/A'}
+                              <Typography variant="body2" color="text.secondary">
+                                {doc.month || 'N/A'} {doc.year || ''}
                               </Typography>
                             </TableCell>
                             <TableCell sx={{ py: 2.5 }}>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
                                   Total: {doc.totalDocuments || 0}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -868,6 +991,11 @@ const StatusPage: React.FC = () => {
                               </Box>
                             </TableCell>
                             <TableCell sx={{ py: 2.5 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                {doc.submittedDate || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 2.5 }}>
                               <Chip 
                                 label={getStatusLabel(doc.status)} 
                                 color={getStatusColor(doc.status || 'unknown')}
@@ -879,47 +1007,60 @@ const StatusPage: React.FC = () => {
                               />
                             </TableCell>
                             <TableCell sx={{ py: 2.5 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                                {doc.submittedDate || 'N/A'}
-                              </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {doc.consultant || 'N/A'}
+                                </Typography>
+                                {doc.approvedBy && doc.approvedBy !== doc.consultant && (
+                                  <Typography variant="caption" color="success.main" sx={{ fontSize: '0.75rem' }}>
+                                    Approved by: {doc.approvedBy}
+                                  </Typography>
+                                )}
+                                {doc.isConsultantApproved && (
+                                  <Chip 
+                                    label="Consultant Approved" 
+                                    size="small"
+                                    color="success"
+                                    sx={{ fontSize: '0.7rem', height: '18px', alignSelf: 'flex-start' }}
+                                  />
+                                )}
+                              </Box>
                             </TableCell>
                             <TableCell sx={{ py: 2.5 }}>
-                              <Typography variant="body2">
-                                {doc.consultant || 'N/A'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell sx={{ py: 2.5 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                                {doc.approvedDate || 'N/A'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right" sx={{ py: 2.5 }}>
-                              <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                <Tooltip title="View Submission Details">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => navigate(`/admin/submissions/${doc.submissionId}`)}
-                                    sx={{ color: '#667eea' }}
-                                  >
-                                    <FontAwesomeIcon icon={faEye} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Download All Documents">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => navigate(`/admin/submissions/${doc.submissionId}/download`)}
-                                    sx={{ color: '#10B981' }}
-                                  >
-                                    <FontAwesomeIcon icon={faDownload} />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                    {doc.approvedDate || 'N/A'}
+                                  </Typography>
+                                  {doc.isConsultantApproved && (
+                                    <FontAwesomeIcon 
+                                      icon={faCheckCircle} 
+                                      style={{ color: '#10B981', fontSize: '14px' }}
+                                    />
+                                  )}
+                                </Box>
+                                {doc.approvedDate !== 'N/A' && doc.reviewNotes && (
+                                  <Tooltip title={doc.reviewNotes} arrow>
+                                    <Typography variant="caption" color="primary" sx={{ cursor: 'help', fontSize: '0.75rem' }}>
+                                      View Notes
+                                    </Typography>
+                                  </Tooltip>
+                                )}
+                                {doc.isFinalApproved && (
+                                  <Chip 
+                                    label="Final Approved" 
+                                    size="small"
+                                    color="success"
+                                    sx={{ fontSize: '0.7rem', height: '18px', alignSelf: 'flex-start' }}
+                                  />
+                                )}
+                              </Box>
                             </TableCell>
                           </TableRow>
                         ))}
                       {filteredDocuments.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                             <Box sx={{ textAlign: 'center' }}>
                               <Typography variant="h6" color="text.secondary" gutterBottom>
                                 No Submissions Found

@@ -50,7 +50,7 @@ const imageToBase64 = (url: string): Promise<string> => {
 /**
  * Load and cache logos
  */
-let cachedLogos: { biec?: string; imtma?: string } = {};
+let cachedLogos: { varuni?: string } = {};
 
 /**
  * Clear logo cache to force reload
@@ -68,38 +68,23 @@ const preloadLogos = async (): Promise<void> => {
     console.log('Starting logo preload...');
     const promises = [];
     
-    if (!cachedLogos.biec) {
-      console.log('Loading BIEC logo from local file...');
+    if (!cachedLogos.varuni) {
+      console.log('Loading Varuni logo from local file...');
       promises.push(
-        imageToBase64('/images/BIEC.png')
+        imageToBase64('/images/Varuni.jpg')
           .then(base64 => {
-            cachedLogos.biec = base64;
-            console.log('BIEC logo preloaded successfully from local file');
+            cachedLogos.varuni = base64;
+            console.log('Varuni logo preloaded successfully from local file');
           })
-          .catch(error => console.warn('Could not preload BIEC logo from local file:', error))
+          .catch(error => console.warn('Could not preload Varuni logo from local file:', error))
       );
     } else {
-      console.log('BIEC logo already cached');
-    }
-    
-    if (!cachedLogos.imtma) {
-      console.log('Loading IMTMA logo...');
-      promises.push(
-        imageToBase64('https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png')
-          .then(base64 => {
-            cachedLogos.imtma = base64;
-            console.log('IMTMA logo preloaded successfully');
-          })
-          .catch(error => console.warn('Could not preload IMTMA logo:', error))
-      );
-    } else {
-      console.log('IMTMA logo already cached');
+      console.log('Varuni logo already cached');
     }
     
     await Promise.all(promises);
     console.log('Logo preload completed. Cache status:', {
-      biec: !!cachedLogos.biec,
-      imtma: !!cachedLogos.imtma
+      varuni: !!cachedLogos.varuni
     });
   } catch (error) {
     console.warn('Error preloading logos:', error);
@@ -140,24 +125,14 @@ const generateComplianceVerificationReport = async (
   const pdf = new jsPDF('portrait', 'mm', 'a4');
   
   try {
-    // Load logos if not cached
-    if (!cachedLogos.biec) {
+    // Load logo if not cached
+    if (!cachedLogos.varuni) {
       try {
-        console.log('Loading BIEC logo from local file...');
-        cachedLogos.biec = await imageToBase64('/images/BIEC.png');
-        console.log('BIEC logo loaded successfully from local file');
+        console.log('Loading Varuni logo from local file...');
+        cachedLogos.varuni = await imageToBase64('/images/Varuni.jpg');
+        console.log('Varuni logo loaded successfully from local file');
       } catch (error) {
-        console.warn('Could not load BIEC logo from local file:', error);
-      }
-    }
-    
-    if (!cachedLogos.imtma) {
-      try {
-        console.log('Loading IMTMA logo from external URL...');
-        cachedLogos.imtma = await imageToBase64('https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png');
-        console.log('IMTMA logo loaded successfully from external URL');
-      } catch (error) {
-        console.warn('Could not load IMTMA logo:', error);
+        console.warn('Could not load Varuni logo from local file:', error);
       }
     }
     
@@ -170,26 +145,18 @@ const generateComplianceVerificationReport = async (
     
     // Helper function to add header to each page
     const addPageHeader = (pageNumber: number, totalPages: number) => {
-      // Add IMTMA logo (Left side)
-      if (cachedLogos.imtma) {
-        pdf.addImage(cachedLogos.imtma, 'PNG', margin, 10, 30, 15);
+      // Add Varuni logo (Top left corner, bigger size)
+      if (cachedLogos.varuni) {
+        const logoWidth = 60;
+        const logoHeight = 30;
+        const logoX = 10; // Top left corner
+        pdf.addImage(cachedLogos.varuni, 'JPEG', logoX, 5, logoWidth, logoHeight);
       } else {
-        pdf.setFillColor(220, 53, 69);
-        pdf.rect(margin, 10, 30, 15, 'F');
+        pdf.setFillColor(70, 130, 180);
+        pdf.rect(10, 5, 60, 30, 'F');
         pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(8);
-        pdf.text('IMTMA', margin + 10, 19);
-      }
-      
-      // Add BIEC logo (Right side)
-      if (cachedLogos.biec) {
-        pdf.addImage(cachedLogos.biec, 'PNG', pageWidth - margin - 30, 10, 30, 15);
-      } else {
-        pdf.setFillColor(0, 123, 255);
-        pdf.rect(pageWidth - margin - 30, 10, 30, 15, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(8);
-        pdf.text('BIEC', pageWidth - margin - 20, 19);
+        pdf.setFontSize(12);
+        pdf.text('VARUNI', 40, 22, { align: 'center' });
       }
       
       // Reset text color
@@ -202,12 +169,12 @@ const generateComplianceVerificationReport = async (
     };
     
     // Helper function to add footer to each page
-    const addPageFooter = (reportId: string, reportDate: string, reportTime: string) => {
+    const addPageFooter = (reportDate: string, reportTime: string) => {
       pdf.setFontSize(7);
       pdf.setFont('helvetica', 'italic');
       pdf.setTextColor(100, 100, 100);
       pdf.text('This is a computer-generated compliance verification report.', pageWidth / 2, footerY, { align: 'center' });
-      pdf.text(`Generated on ${reportDate} at ${reportTime} | Report ID: ${reportId}`, pageWidth / 2, footerY + 3, { align: 'center' });
+      pdf.text(`Generated on ${reportDate} at ${reportTime}`, pageWidth / 2, footerY + 3, { align: 'center' });
       pdf.setTextColor(0, 0, 0);
     };
     
@@ -244,7 +211,7 @@ const generateComplianceVerificationReport = async (
     if (submissionData.documents && submissionData.documents.length > 0) {
       documentsToShow = submissionData.documents.map((doc: any, index: number) => ({
         slNo: index + 1,
-        particulars: doc.documentName || doc.title || doc.documentType || 'Unknown Document',
+        particulars: doc.documentType || doc.documentName || doc.title || 'Unknown Document',
         status: doc.status ? doc.status.toUpperCase() : 'PENDING',
         remarks: doc.consultantRemarks || doc.remarks || 'Under review'
       }));
@@ -273,7 +240,7 @@ const generateComplianceVerificationReport = async (
     // Report info line
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Report ID: ${reportId} | Generated: ${reportDate} | Period: ${month} ${year}`, pageWidth / 2, currentY, { align: 'center' });
+    pdf.text(`Generated: ${reportDate} | Period: ${month} ${year}`, pageWidth / 2, currentY, { align: 'center' });
     
     currentY += 15;
     
@@ -285,13 +252,13 @@ const generateComplianceVerificationReport = async (
     
     // Create comprehensive vendor information table
     const vendorInfoData = [
-      ['Name & Address of the Vendor', `${vendorData.name || 'Unknown'}\n${vendorData.company || ''}\n${vendorData.address || vendorData.email || ''}`],
+      ['Name & Address of the Vendor', `${vendorData.name || 'Unknown'}\n${vendorData.company || ''}\n${vendorData.address || ''}`],
       ['Location of Work', workLocation],
       ['Agreement Period', agreementPeriod],
       ['Month', `${month} ${year}`],
       ['Audit Review', auditReview],
       ['Remarks if any', remarks],
-      ['Seal with Signature of Auditor', `Verified by: ${auditorName}\nDate: ${reportDate}`]
+      ['Seal with Signature of Auditor', '']
     ];
     
     autoTable(pdf, {
@@ -300,23 +267,32 @@ const generateComplianceVerificationReport = async (
       theme: 'grid',
       columnStyles: {
         0: { 
-          cellWidth: 55, 
+          cellWidth: 65, 
           fontStyle: 'bold',
           fillColor: [240, 240, 240],
-          valign: 'top'
+          valign: 'top',
+          fontSize: 11
         },
         1: { 
-          cellWidth: contentWidth - 55,
-          fontStyle: 'normal',
-          valign: 'top'
+          cellWidth: contentWidth - 65,
+          fontStyle: 'bold',
+          valign: 'top',
+          fontSize: 11
         }
       },
       styles: {
-        cellPadding: 4,
-        fontSize: 9,
+        cellPadding: 6,
+        fontSize: 11,
+        fontStyle: 'bold',
         lineColor: [0, 0, 0],
-        lineWidth: 0.3,
+        lineWidth: 0.4,
         overflow: 'linebreak'
+      },
+      didParseCell: function (data) {
+        // Make the seal and signature row (last row) taller
+        if (data.row.index === vendorInfoData.length - 1) {
+          data.cell.styles.minCellHeight = 32; // Increase height to 25mm
+        }
       }
     });
     
@@ -325,55 +301,18 @@ const generateComplianceVerificationReport = async (
     // Skip the compliance summary section as requested
     currentY += 5;
     
-    // Certification Section
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CERTIFICATION', margin, currentY);
-    currentY += 8;
+    addPageFooter(reportDate, reportTime);
     
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    const certificationText = `This is to certify that the above-mentioned vendor has submitted all required documents for the period of ${month} ${year}.`;
-    
-    const splitText = pdf.splitTextToSize(certificationText, contentWidth);
-    pdf.text(splitText, margin, currentY);
-    currentY += splitText.length * 4 + 12;
-    
-    // Signature Section
-    const signatureWidth = (contentWidth - 20) / 2;
-    
-    // Left signature
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Verified & Certified By:', margin, currentY);
-    pdf.line(margin, currentY + 12, margin + signatureWidth - 10, currentY + 12);
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(auditorName, margin, currentY + 16);
-    pdf.text('Compliance Auditor', margin, currentY + 20);
-    pdf.text(`Date: ${reportDate}`, margin, currentY + 24);
-    
-    // Right seal
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Organization Seal:', margin + signatureWidth + 20, currentY);
-    pdf.rect(margin + signatureWidth + 20, currentY + 4, signatureWidth - 10, 22);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('(Official Seal)', margin + signatureWidth + 20 + (signatureWidth - 10) / 2, currentY + 17, { align: 'center' });
-    
-    addPageFooter(reportId, reportDate, reportTime);
-    
-    // ==================== PAGE 2: DOCUMENTS VERIFICATION CHECKLIST ====================
+    // ==================== PAGE 2: DOCUMENTS VERIFICATION REPORT ====================
     pdf.addPage();
     addPageHeader(2, totalPages);
     
     currentY = 35;
     
-    // Documents Verification Section
+    // Documents Verification Section 
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('DOCUMENTS VERIFICATION CHECKLIST', pageWidth / 2, currentY, { align: 'center' });
+    pdf.text('DOCUMENTS VERIFICATION REPORT', pageWidth / 2, currentY, { align: 'center' });
     
     currentY += 5;
     pdf.setLineWidth(0.8);
@@ -402,21 +341,22 @@ const generateComplianceVerificationReport = async (
         fillColor: [70, 130, 180],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 10,
+        fontSize: 12,
         halign: 'center'
       },
       columnStyles: {
-        0: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-        1: { cellWidth: 90 },
-        2: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
-        3: { cellWidth: 55 }
+        0: { cellWidth: 18, halign: 'center', fontStyle: 'bold', fontSize: 10 },
+        1: { cellWidth: 100, fontStyle: 'bold', fontSize: 10 },
+        2: { cellWidth: 35, halign: 'center', fontStyle: 'bold', fontSize: 10 },
+        3: { cellWidth: 60, fontStyle: 'bold', fontSize: 10 }
       },
       styles: {
-        cellPadding: 4,
-        fontSize: 8,
+        cellPadding: 6,
+        fontSize: 10,
+        fontStyle: 'bold',
         overflow: 'linebreak',
         lineColor: [150, 150, 150],
-        lineWidth: 0.2,
+        lineWidth: 0.3,
         valign: 'top'
       },
       alternateRowStyles: {
@@ -427,7 +367,7 @@ const generateComplianceVerificationReport = async (
       }
     });
     
-    addPageFooter(reportId, reportDate, reportTime);
+    addPageFooter(reportDate, reportTime);
     
     return pdf;
   } catch (error) {
@@ -453,24 +393,14 @@ const generateVerificationReport = async (
   const pdf = new jsPDF('portrait', 'mm', 'a4');
   
   try {
-    // Load logos if not cached
-    if (!cachedLogos.biec) {
+    // Load logo if not cached
+    if (!cachedLogos.varuni) {
       try {
-        console.log('Loading BIEC logo from local file in PDF generation...');
-        cachedLogos.biec = await imageToBase64('/images/BIEC.png');
-        console.log('BIEC logo loaded successfully from local file');
+        console.log('Loading Varuni logo from local file in PDF generation...');
+        cachedLogos.varuni = await imageToBase64('/images/Varuni.jpg');
+        console.log('Varuni logo loaded successfully from local file');
       } catch (error) {
-        console.warn('Could not load BIEC logo from local file:', error);
-      }
-    }
-    
-    if (!cachedLogos.imtma) {
-      try {
-        console.log('Loading IMTMA logo from external URL...');
-        cachedLogos.imtma = await imageToBase64('https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png');
-        console.log('IMTMA logo loaded successfully from external URL');
-      } catch (error) {
-        console.warn('Could not load IMTMA logo:', error);
+        console.warn('Could not load Varuni logo from local file:', error);
       }
     }
     
@@ -480,41 +410,28 @@ const generateVerificationReport = async (
     const margin = 20;
     const contentWidth = pageWidth - (2 * margin);
     
-    // Header Section with Logos
-    let currentY = 25;
+    // Header Section with Logo
+    let currentY = 50; // Start after logo (logo ends at Y=45)
     
-    // Add IMTMA logo (Left side)
-    console.log('VERIFICATION REPORT - IMTMA logo available:', !!cachedLogos.imtma);
-    if (cachedLogos.imtma) {
-      console.log('VERIFICATION REPORT - Adding IMTMA logo to PDF');
-      pdf.addImage(cachedLogos.imtma, 'PNG', margin, currentY, 40, 20);
+    // Add Varuni logo (Top left corner, bigger size)
+    console.log('VERIFICATION REPORT - Varuni logo available:', !!cachedLogos.varuni);
+    if (cachedLogos.varuni) {
+      console.log('VERIFICATION REPORT - Adding Varuni logo to PDF');
+      const logoWidth = 80;
+      const logoHeight = 40;
+      const logoX = 10; // Top left corner
+      pdf.addImage(cachedLogos.varuni, 'JPEG', logoX, 5, logoWidth, logoHeight);
     } else {
-      console.log('VERIFICATION REPORT - Using IMTMA fallback rectangle');
-      pdf.setFillColor(220, 53, 69);
-      pdf.rect(margin, currentY, 40, 20, 'F');
+      console.log('VERIFICATION REPORT - Using Varuni fallback rectangle');
+      pdf.setFillColor(70, 130, 180);
+      pdf.rect(10, 5, 80, 40, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(10);
-      pdf.text('IMTMA', margin + 15, currentY + 12);
-    }
-    
-    // Add BIEC logo (Right side)
-    console.log('VERIFICATION REPORT - BIEC logo available:', !!cachedLogos.biec);
-    if (cachedLogos.biec) {
-      console.log('VERIFICATION REPORT - Adding BIEC logo to PDF');
-      pdf.addImage(cachedLogos.biec, 'PNG', pageWidth - margin - 40, currentY, 40, 20);
-    } else {
-      console.log('VERIFICATION REPORT - Using BIEC fallback rectangle');
-      pdf.setFillColor(0, 123, 255);
-      pdf.rect(pageWidth - margin - 40, currentY, 40, 20, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(10);
-      pdf.text('BIEC', pageWidth - margin - 25, currentY + 12);
+      pdf.setFontSize(14);
+      pdf.text('VARUNI', 50, 27, { align: 'center' });
     }
     
     // Reset text color
     pdf.setTextColor(0, 0, 0);
-    
-    currentY += 35;
     
     // Main Title Section
     pdf.setFontSize(18);
@@ -540,8 +457,6 @@ const generateVerificationReport = async (
     const reportTime = format(new Date(), 'HH:mm:ss');
     
     pdf.text(`Report Generated: ${reportDate} at ${reportTime}`, margin, currentY);
-    currentY += 6;
-    pdf.text(`Report ID: DVR-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, margin, currentY);
     
     currentY += 15;
     
@@ -555,11 +470,9 @@ const generateVerificationReport = async (
     const vendorInfoData = [
       ['Vendor Name', vendorData.name || 'Not specified'],
       ['Company/Organization', vendorData.company || 'Not specified'],
-      ['Contact Email', vendorData.email || 'Not specified'],
       ['Address', vendorData.address || 'Not specified'],
       ['Verification Date', reportDate],
-      ['Total Documents', documents.length.toString()],
-      ['Verified By', 'System Consultant']
+      ['Total Documents', documents.length.toString()]
     ];
     
     autoTable(pdf, {
@@ -600,7 +513,6 @@ const generateVerificationReport = async (
     // Prepare document table data with enhanced formatting
     const tableData = documents.map((doc, index) => [
       (index + 1).toString().padStart(2, '0'),
-      doc.title || 'Untitled Document',
       doc.documentType || 'General',
       typeof doc.submissionDate === 'string' ? format(new Date(doc.submissionDate), 'dd/MM/yyyy') : 'Unknown',
       doc.status?.toUpperCase() || 'PENDING',
@@ -608,7 +520,7 @@ const generateVerificationReport = async (
     ]);
     
     autoTable(pdf, {
-      head: [['S.No', 'Document Title', 'Document Type', 'Submission Date', 'Status', 'Verification Remarks']],
+      head: [['S.No', 'Document Type', 'Submission Date', 'Status', 'Verification Remarks']],
       body: tableData,
       startY: currentY,
       theme: 'striped',
@@ -621,11 +533,10 @@ const generateVerificationReport = async (
       },
       columnStyles: {
         0: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 25, halign: 'center' },
-        4: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
-        5: { cellWidth: 45 }
+        1: { cellWidth: 60 },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+        4: { cellWidth: 60 }
       },
       styles: {
         cellPadding: 5,
@@ -684,44 +595,7 @@ const generateVerificationReport = async (
     pdf.setTextColor(0, 0, 0);
     currentY += 15;
     
-    // Certification Statement
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CERTIFICATION', margin, currentY);
-    currentY += 10;
-    
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    const certificationText = `This document verification report certifies that all listed documents have been thoroughly reviewed and verified according to established compliance standards and regulatory requirements. The verification process ensures document authenticity, completeness, and adherence to applicable guidelines.`;
-    
-    const splitText = pdf.splitTextToSize(certificationText, contentWidth);
-    pdf.text(splitText, margin, currentY);
-    currentY += splitText.length * 5 + 15;
-    
-    // Signature Section
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'bold');
-    
-    // Verifier signature
-    pdf.text('Verified By:', margin, currentY);
-    currentY += 15;
-    pdf.line(margin, currentY, margin + 60, currentY);
-    currentY += 5;
-    pdf.setFontSize(10);
-    pdf.text('System Consultant', margin, currentY);
-    currentY += 4;
-    pdf.text('Document Verification Officer', margin, currentY);
-    currentY += 4;
-    pdf.text(`Date: ${reportDate}`, margin, currentY);
-    
-    // Organization seal area
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Official Seal:', pageWidth - margin - 60, currentY - 23);
-    pdf.rect(pageWidth - margin - 60, currentY - 15, 50, 20);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('(Organization Seal)', pageWidth - margin - 45, currentY - 5, { align: 'center' });
+    // Skip certification and signature sections as requested
     
     // Footer
     currentY = pageHeight - 30;
@@ -729,7 +603,7 @@ const generateVerificationReport = async (
     pdf.setFont('helvetica', 'italic');
     pdf.setTextColor(100, 100, 100);
     pdf.text('This is a computer-generated document verification report.', pageWidth / 2, currentY, { align: 'center' });
-    pdf.text(`Generated on ${reportDate} at ${reportTime} | Report ID: DVR-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, pageWidth / 2, currentY + 4, { align: 'center' });
+    pdf.text(`Generated on ${reportDate} at ${reportTime}`, pageWidth / 2, currentY + 4, { align: 'center' });
     
     return pdf;
   } catch (error) {
@@ -755,87 +629,58 @@ const generateComplianceReport = async (
   const pdf = new jsPDF();
   
   try {
-    // Load logos if not cached
-    if (!cachedLogos.biec) {
+    // Load logo if not cached
+    if (!cachedLogos.varuni) {
       try {
-        console.log('Loading BIEC logo from local file in compliance report...');
-        cachedLogos.biec = await imageToBase64('/images/BIEC.png');
-        console.log('BIEC logo loaded successfully from local file');
+        console.log('Loading Varuni logo from local file in compliance report...');
+        cachedLogos.varuni = await imageToBase64('/images/Varuni.jpg');
+        console.log('Varuni logo loaded successfully from local file');
       } catch (error) {
-        console.warn('Could not load BIEC logo from local file:', error);
+        console.warn('Could not load Varuni logo from local file:', error);
       }
     }
     
-    if (!cachedLogos.imtma) {
-      try {
-        console.log('Loading IMTMA logo from external URL...');
-        cachedLogos.imtma = await imageToBase64('https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png');
-        console.log('IMTMA logo loaded successfully from external URL');
-      } catch (error) {
-        console.warn('Could not load IMTMA logo:', error);
-      }
-    }
-    
-    // Add IMTMA logo (Left side)
-    console.log('COMPLIANCE REPORT - IMTMA logo available:', !!cachedLogos.imtma);
-    if (cachedLogos.imtma) {
-      console.log('COMPLIANCE REPORT - Adding IMTMA logo to PDF at position (15, 15)');
-      pdf.addImage(cachedLogos.imtma, 'PNG', 15, 15, 50, 25);
-      console.log('COMPLIANCE REPORT - IMTMA logo added successfully');
+    // Add Varuni logo (Top left corner, bigger size)
+    console.log('COMPLIANCE REPORT - Varuni logo available:', !!cachedLogos.varuni);
+    if (cachedLogos.varuni) {
+      console.log('COMPLIANCE REPORT - Adding Varuni logo to PDF at top left corner');
+      const logoWidth = 80;
+      const logoHeight = 40;
+      const logoX = 10; // Top left corner
+      pdf.addImage(cachedLogos.varuni, 'JPEG', logoX, 10, logoWidth, logoHeight);
+      console.log('COMPLIANCE REPORT - Varuni logo added successfully');
     } else {
-      console.log('COMPLIANCE REPORT - Using IMTMA fallback rectangle');
+      console.log('COMPLIANCE REPORT - Using Varuni fallback rectangle');
       // Fallback to colored rectangle
-      pdf.setFillColor(220, 53, 69);
-      pdf.rect(15, 15, 50, 25, 'F');
+      pdf.setFillColor(70, 130, 180);
+      pdf.rect(10, 10, 80, 40, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(12);
-      pdf.text('IMTMA', 30, 30);
-    }
-    
-    // Add BIEC logo (Right side)
-    console.log('COMPLIANCE REPORT - BIEC logo available:', !!cachedLogos.biec);
-    if (cachedLogos.biec) {
-      console.log('COMPLIANCE REPORT - Adding BIEC logo to PDF at position (145, 15)');
-      pdf.addImage(cachedLogos.biec, 'PNG', 145, 15, 50, 25);
-      console.log('COMPLIANCE REPORT - BIEC logo added successfully');
-    } else {
-      console.log('COMPLIANCE REPORT - Using BIEC fallback rectangle');
-      // Fallback to colored rectangle
-      pdf.setFillColor(0, 123, 255);
-      pdf.rect(145, 15, 50, 25, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(12);
-      pdf.text('BIEC', 162, 30);
+      pdf.setFontSize(14);
+      pdf.text('VARUNI', 50, 32, { align: 'center' });
     }
     
   } catch (error) {
-    console.warn('Error loading logos, using fallback design:', error);
-    // Fallback to original colored rectangles
-    pdf.setFillColor(0, 123, 255);
-    pdf.rect(15, 15, 30, 15, 'F');
+    console.warn('Error loading logo, using fallback design:', error);
+    // Fallback to colored rectangle
+    pdf.setFillColor(70, 130, 180);
+    pdf.rect(10, 10, 80, 40, 'F');
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(10);
-    pdf.text('BIEC', 25, 24);
-    
-    pdf.setFillColor(220, 53, 69);
-    pdf.rect(165, 15, 30, 15, 'F');
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('IMTMA', 173, 24);
+    pdf.setFontSize(14);
+    pdf.text('VARUNI', 50, 32, { align: 'center' });
   }
   
   // Reset text color
   pdf.setTextColor(0, 0, 0);
   
-  // Add title (moved down to avoid logo overlap - logos end at Y=40)
+  // Add title (moved down to avoid logo overlap - logo ends at Y=50)
   pdf.setFontSize(18);
-  pdf.text(title, 105, 55, { align: 'center' });
+  pdf.text(title, 105, 60, { align: 'center' });
   
   // Add vendor information (moved down with proper spacing)
   pdf.setFontSize(12);
-  pdf.text(`Vendor: ${vendorData.name || 'Unknown'}`, 15, 70);
-  pdf.text(`Company: ${vendorData.company || 'Unknown'}`, 15, 77);
-  pdf.text(`Email: ${vendorData.email || 'Unknown'}`, 15, 84);
-  pdf.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 15, 91);
+  pdf.text(`Vendor: ${vendorData.name || 'Unknown'}`, 15, 75);
+  pdf.text(`Company: ${vendorData.company || 'Unknown'}`, 15, 82);
+  pdf.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 15, 89);
   
   // Add compliance data (moved down with proper spacing)
   // This would be customized based on the specific compliance data structure

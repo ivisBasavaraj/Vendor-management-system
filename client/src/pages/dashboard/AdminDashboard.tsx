@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotificationPopup } from '../../contexts/NotificationPopupContext';
 import apiService from '../../utils/api';
 
 import {
@@ -18,7 +17,7 @@ import DashboardOverview from './components/DashboardOverview';
 interface DashboardStats {
   totalVendors: number;
   totalConsultants: number;
-  totalDocuments: number;
+  totalSubmissions: number;
   activeUsers: number;
   pendingApprovals: number;
   documentsByStatus: Array<{ name: string; value: number; }>;
@@ -30,34 +29,18 @@ interface DashboardStats {
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { showNotification } = useNotificationPopup();
   const [loading, setLoading] = useState(true);
   const [pendingLoginApprovalsCount, setPendingLoginApprovalsCount] = useState(0);
   const [stats, setStats] = useState<DashboardStats>({
     totalVendors: 0,
     totalConsultants: 0,
-    totalDocuments: 0,
+    totalSubmissions: 0,
     activeUsers: 0,
     pendingApprovals: 0,
     documentsByStatus: [],
     documentsByMonth: [],
     userActivity: []
   });
-
-  // Test notification function
-  const testNotification = () => {
-    showNotification({
-      title: 'Test Notification',
-      message: 'This is a test notification to verify the popup system is working with sound!',
-      type: 'system',
-      priority: 'medium',
-      createdAt: new Date().toISOString(),
-      sender: {
-        name: 'System',
-        email: 'system@imtma.com'
-      }
-    });
-  };
 
   // Fetch pending login approvals count
   const fetchPendingLoginApprovalsCount = async () => {
@@ -96,7 +79,7 @@ const AdminDashboard: React.FC = () => {
         setStats({
           totalVendors: 45,
           totalConsultants: 12,
-          totalDocuments: 156,
+          totalSubmissions: 156,
           activeUsers: 57,
           pendingApprovals: 8,
           documentsByStatus: [
@@ -247,14 +230,6 @@ const AdminDashboard: React.FC = () => {
                   {pendingLoginApprovalsCount}
                 </span>
               )}
-            </Button>
-            <Button
-              leftIcon={<BellIcon className="h-5 w-5" />}
-              size="sm"
-              variant="secondary"
-              onClick={testNotification}
-            >
-              Test Notification
             </Button>
           </div>
         </motion.div>

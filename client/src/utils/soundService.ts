@@ -28,7 +28,7 @@ class SoundService {
   }
 
   /**
-   * Preload notification sound files (optional - will fallback to generated sounds)
+   * Preload notification sound files
    */
   private preloadSounds() {
     const soundFiles = {
@@ -42,20 +42,11 @@ class SoundService {
     Object.entries(soundFiles).forEach(([type, url]) => {
       try {
         const audio = new Audio(url);
-        audio.preload = 'metadata'; // Changed from 'auto' to reduce loading time
+        audio.preload = 'auto';
         audio.volume = 0.3;
-        
-        // Test if the audio file exists
-        audio.addEventListener('canplaythrough', () => {
-          this.audioCache.set(type, audio);
-        });
-        
-        audio.addEventListener('error', () => {
-          console.log(`Sound file ${type} not found, will use generated sound`);
-        });
-        
+        this.audioCache.set(type, audio);
       } catch (error) {
-        console.log(`Sound file ${type} not available, will use generated sound`);
+        console.warn(`Failed to preload sound ${type}:`, error);
       }
     });
   }
@@ -140,22 +131,16 @@ class SoundService {
    * Play notification sound based on type
    */
   playNotificationSound(options: SoundOptions = {}) {
-    if (!this.isEnabled || !this.isEnabledForUser()) {
-      console.log('Sound service disabled');
-      return;
-    }
+    if (!this.isEnabled || !this.isEnabledForUser()) return;
 
     const { volume = 0.3, type = 'default' } = options;
-    console.log(`Playing notification sound: ${type} at volume ${volume}`);
 
     // Try to play audio file first
     if (this.playAudioFile(type, volume)) {
-      console.log(`Played audio file for ${type}`);
       return;
     }
 
     // Fallback to generated sounds
-    console.log(`Using generated sound for ${type}`);
     switch (type) {
       case 'success':
         // Higher pitch for success - pleasant ascending tones

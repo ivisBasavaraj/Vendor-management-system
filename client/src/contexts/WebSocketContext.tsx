@@ -49,39 +49,25 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [documentNotifications, setDocumentNotifications] = useState<DocumentNotification[]>([]);
 
   useEffect(() => {
-    // Use environment variable or fallback to localhost
-    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:5000';
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket('ws://localhost:5000');
 
     ws.onopen = () => {
-      console.log('WebSocket connected successfully');
       setIsConnected(true);
       setSocket(ws);
     };
 
     ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('WebSocket message received:', message);
-        
-        if (message.type === 'login_approval') {
-          addLoginApprovalNotification(message.data);
-        } else if (message.type === 'notification') {
-          addDocumentNotification(message.data);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+      const message = JSON.parse(event.data);
+      if (message.type === 'login_approval') {
+        addLoginApprovalNotification(message.data);
+      } else if (message.type === 'notification') {
+        addDocumentNotification(message.data);
       }
     };
 
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed:', event.code, event.reason);
+    ws.onclose = () => {
       setIsConnected(false);
       setSocket(null);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
     };
 
     return () => {

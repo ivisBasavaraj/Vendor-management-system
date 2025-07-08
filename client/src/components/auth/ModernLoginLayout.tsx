@@ -106,9 +106,8 @@ const ModernLoginLayout: React.FC<ModernLoginLayoutProps> = ({
         </div>
         
         <div className="relative z-10 flex flex-col justify-between p-6 lg:p-8 text-white w-full h-full">
-          {/* Logos positioned at top-left corner */}
-          <div className="flex-shrink-0 mb-6">
-            <div className="flex flex-row items-center space-x-3">
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="mb-6 flex flex-row items-center space-x-3">
               <img 
                 src={logoUrl} 
                 alt="IMTMA Logo" 
@@ -122,10 +121,6 @@ const ModernLoginLayout: React.FC<ModernLoginLayoutProps> = ({
                 style={{ maxWidth: '150px' }}
               />
             </div>
-          </div>
-          
-          {/* Main content centered vertically */}
-          <div className="flex-1 flex flex-col justify-center">
             <motion.div
               key="left-content"
               initial="hidden"

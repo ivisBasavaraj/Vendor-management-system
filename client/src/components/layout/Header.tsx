@@ -1,14 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-
-interface HeaderNotification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -27,53 +19,30 @@ const Header: React.FC = () => {
     if (userMenuOpen) setUserMenuOpen(false);
   };
 
-  // Real notifications will be fetched from the API
-  const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Fetch notifications from API
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user) return;
-      
-      try {
-        const response = await fetch('/api/notifications/my', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            // Get the latest 5 notifications for the dropdown
-            const latestNotifications = data.data.slice(0, 5).map((notification: any): HeaderNotification => ({
-              id: notification._id,
-              title: notification.title,
-              message: notification.message,
-              time: new Date(notification.createdAt).toLocaleString(),
-              read: notification.isRead
-            }));
-            setNotifications(latestNotifications);
-            setUnreadCount(data.unread || 0);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-        // Set empty state on error
-        setNotifications([]);
-        setUnreadCount(0);
-      }
-    };
-
-    fetchNotifications();
-    
-    // Refresh notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    
-    return () => clearInterval(interval);
-  }, [user]);
+  // Sample notifications for demo purposes
+  const notifications = [
+    {
+      id: 1,
+      title: 'New Document Submitted',
+      message: 'A vendor has submitted a new document for review.',
+      time: '10 min ago',
+      read: false
+    },
+    {
+      id: 2,
+      title: 'Document Approved',
+      message: 'Your document has been approved by the consultant.',
+      time: '1 hour ago',
+      read: true
+    },
+    {
+      id: 3,
+      title: 'Document Rejected',
+      message: 'Your document has been rejected. Please see the remarks.',
+      time: '2 hours ago',
+      read: true
+    }
+  ];
 
   return (
     <header className="bg-white shadow-sm">
@@ -121,15 +90,11 @@ const Header: React.FC = () => {
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
               </svg>
-              {/* Notification Badge - Only show if there are unread notifications */}
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-white text-xs font-bold items-center justify-center">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                </span>
-              )}
+              {/* Notification Badge */}
+              <span className="absolute top-0 right-0 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
             </button>
 
             {/* Notifications Dropdown */}

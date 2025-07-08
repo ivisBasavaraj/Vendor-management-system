@@ -374,6 +374,12 @@ const VendorDocumentsPage: React.FC = () => {
         return;
       }
       
+      // Wait for user to be loaded before proceeding
+      if (!user) {
+        console.log('User not loaded yet, waiting...');
+        return;
+      }
+      
       console.log('Fetching data for vendor ID:', vendorId);
       
       // Clear cache and preload logos for PDF generation
@@ -390,16 +396,34 @@ const VendorDocumentsPage: React.FC = () => {
           const vendorData = vendorResponse.data.data;
           
           // Check if this vendor is assigned to the current consultant
-          if (vendorData.assignedConsultant && vendorData.assignedConsultant === user?.id) {
+          const assignedConsultantId = typeof vendorData.assignedConsultant === 'object' 
+            ? vendorData.assignedConsultant?._id || vendorData.assignedConsultant?.id
+            : vendorData.assignedConsultant;
+          
+          const currentUserId = user?._id || user?.id;
+          
+          console.log('Permission check:', {
+            vendorId: vendorData._id,
+            vendorName: vendorData.name,
+            assignedConsultantId,
+            currentUserId,
+            userRole: user?.role,
+            assignedConsultantObject: vendorData.assignedConsultant
+          });
+          
+          if (assignedConsultantId && assignedConsultantId === currentUserId) {
+            console.log('Permission granted: Vendor is assigned to current consultant');
             setVendor(vendorData);
           } else {
             // Check if the user is an admin (admins can view all vendors)
             if (user?.role !== 'admin') {
+              console.log('Permission denied: Vendor not assigned to current consultant and user is not admin');
               setError('You do not have permission to view this vendor');
               setLoading(false);
-              return; // Stop further execution
+              return;
             } else {
               // Admin can view all vendors
+              console.log('Permission granted: User is admin');
               setVendor(vendorData);
             }
           }
@@ -748,7 +772,7 @@ const VendorDocumentsPage: React.FC = () => {
     };
 
     fetchData();
-  }, [vendorId]);
+  }, [vendorId, user]);
 
   // Auto-refresh when page regains focus (user comes back to tab)
   useEffect(() => {

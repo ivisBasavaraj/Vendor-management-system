@@ -235,69 +235,7 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
-  // Test popup notification
-  const testPopupNotification = () => {
-    showNotification({
-      title: 'Test Pop-up Notification',
-      message: 'This is a test notification to demonstrate the pop-up system with sound effects!',
-      type: 'system',
-      priority: 'medium',
-      createdAt: new Date().toISOString(),
-      sender: {
-        name: 'System',
-        email: 'system@example.com'
-      }
-    });
-  };
 
-  // Test all notification types
-  const testAllNotificationTypes = () => {
-    const testNotifications = [
-      {
-        title: 'Document Approved ✅',
-        message: 'Your compliance document has been approved by the consultant.',
-        type: 'document_approved' as const,
-        priority: 'high' as const,
-      },
-      {
-        title: 'New Document Submission 📄',
-        message: 'A new document has been submitted for review.',
-        type: 'document_submission' as const,
-        priority: 'medium' as const,
-      },
-      {
-        title: 'Document Rejected ❌',
-        message: 'Your document needs revision. Please check the comments.',
-        type: 'document_rejected' as const,
-        priority: 'high' as const,
-      },
-      {
-        title: 'System Update 🔧',
-        message: 'The system will undergo maintenance tonight at 2 AM.',
-        type: 'system' as const,
-        priority: 'low' as const,
-      },
-      {
-        title: 'Urgent: Login Request 🚨',
-        message: 'New vendor login request requires immediate attention.',
-        type: 'login_request' as const,
-        priority: 'urgent' as const,
-      }
-    ];
-
-    testNotifications.forEach((notification, index) => {
-      setTimeout(() => {
-        showNotification({
-          ...notification,
-          createdAt: new Date().toISOString(),
-          sender: {
-            name: 'Demo System',
-            email: 'demo@example.com'
-          }
-        });
-      }, index * 2000); // 2 second delay between each notification
-    });
-  };
 
   // Helper function to show browser notification
   const showBrowserNotification = (notification: Notification) => {
@@ -421,36 +359,6 @@ const NotificationsPage: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            {/* Test Pop-up Notification Button */}
-            <button
-              onClick={testPopupNotification}
-              className="px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-              title="Test Pop-up Notification"
-            >
-              <FontAwesomeIcon icon={faBell} className="mr-2" />
-              Test Pop-up
-            </button>
-
-            {/* Test All Notification Types */}
-            <button
-              onClick={testAllNotificationTypes}
-              className="px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-              title="Test All Notification Types"
-            >
-              <FontAwesomeIcon icon={faBell} className="mr-2" />
-              Demo All
-            </button>
-
-            {/* Test Sound Effects */}
-            <button
-              onClick={() => soundService.testAllSounds()}
-              className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              title="Test All Sound Effects"
-            >
-              <FontAwesomeIcon icon={faVolumeUp} className="mr-2" />
-              Test Sounds
-            </button>
-
             {/* Pop-up Settings */}
             <button
               onClick={() => setShowSettings(!showSettings)}

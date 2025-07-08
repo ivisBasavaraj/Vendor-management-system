@@ -160,29 +160,19 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({
   };
 
   const getPositionClasses = () => {
+    const baseOffset = index * 120; // Stack notifications
+    
     switch (position) {
       case 'top-right':
-        return 'top-4 right-4';
+        return `top-4 right-4 transform translate-x-${isVisible ? '0' : 'full'} translate-y-${baseOffset}px`;
       case 'top-left':
-        return 'top-4 left-4';
+        return `top-4 left-4 transform translate-x-${isVisible ? '0' : '-full'} translate-y-${baseOffset}px`;
       case 'bottom-right':
-        return 'bottom-4 right-4';
+        return `bottom-4 right-4 transform translate-x-${isVisible ? '0' : 'full'} -translate-y-${baseOffset}px`;
       case 'bottom-left':
-        return 'bottom-4 left-4';
+        return `bottom-4 left-4 transform translate-x-${isVisible ? '0' : '-full'} -translate-y-${baseOffset}px`;
       default:
-        return 'top-4 right-4';
-    }
-  };
-
-  const getTransformStyle = () => {
-    const baseOffset = index * 120; // Stack notifications
-    const translateX = isVisible ? '0' : 
-      (position.includes('right') ? '100%' : '-100%');
-    
-    if (position.includes('bottom')) {
-      return `translateY(-${baseOffset}px) translateX(${translateX})`;
-    } else {
-      return `translateY(${baseOffset}px) translateX(${translateX})`;
+        return `top-4 right-4 transform translate-x-${isVisible ? '0' : 'full'} translate-y-${baseOffset}px`;
     }
   };
 
@@ -195,7 +185,8 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({
         ${isClosing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
       `}
       style={{ 
-        transform: getTransformStyle()
+        transform: `translateY(${index * 120}px) ${isVisible ? 'translateX(0)' : 
+          position.includes('right') ? 'translateX(100%)' : 'translateX(-100%)'}`
       }}
     >
       <div className={`

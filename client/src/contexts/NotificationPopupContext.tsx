@@ -97,12 +97,7 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
   };
 
   const showNotification = useCallback((notification: Omit<PopupNotification, 'id'>) => {
-    console.log('showNotification called with:', notification);
-    
-    if (!shouldShowNotification(notification)) {
-      console.log('Notification filtered out by settings');
-      return;
-    }
+    if (!shouldShowNotification(notification)) return;
 
     const newNotification: PopupNotification = {
       ...notification,
@@ -110,8 +105,6 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
       autoClose: settings.autoClose,
       duration: settings.duration,
     };
-
-    console.log('Adding notification to state:', newNotification);
 
     setNotifications(prev => {
       const updated = [newNotification, ...prev];
@@ -122,10 +115,7 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
     // Play sound if enabled
     if (settings.soundEnabled) {
       const soundType = getNotificationSoundType(notification.type);
-      console.log('Playing sound:', soundType);
       soundService.playNotificationSound({ type: soundType, volume: 0.3 });
-    } else {
-      console.log('Sound disabled in settings');
     }
 
     // Browser notification (if permission granted)
