@@ -9,8 +9,11 @@ import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
 // API URL from environment or default
 // Using base URL without /api suffix to avoid duplication
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://vendor-management-system-api.herokuapp.com';
 const API_PREFIX = '/api';
+
+// Log the API base URL being used
+console.log('API Base URL:', API_BASE_URL);
 
 // Create axios instance with default config
 const api = axios.create({

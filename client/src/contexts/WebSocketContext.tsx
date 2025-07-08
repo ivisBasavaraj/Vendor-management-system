@@ -49,9 +49,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [documentNotifications, setDocumentNotifications] = useState<DocumentNotification[]>([]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:5000');
+    // Get WebSocket URL from environment or use a secure fallback for production
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsBaseUrl = process.env.REACT_APP_API_BASE_URL || 'https://vendor-management-system-api.herokuapp.com';
+    const wsUrl = wsBaseUrl.replace(/^https?:/, wsProtocol);
+    
+    console.log('Connecting to WebSocket at:', wsUrl);
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      console.log('WebSocket connection established');
       setIsConnected(true);
       setSocket(ws);
     };

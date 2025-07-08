@@ -9,9 +9,13 @@ class SocketService {
   initialize(server) {
     this.io = socketIo(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        methods: ['GET', 'POST'],
-        credentials: true
+        origin: [
+          process.env.FRONTEND_URL || 'http://localhost:3000',
+          'https://vendors.biec.in'
+        ],
+        methods: ['GET', 'POST', 'OPTIONS'],
+        credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization']
       }
     });
 

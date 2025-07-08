@@ -25,14 +25,22 @@ const corsOptions = {
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
       'https://api.emailjs.com',
+      'https://vendors.biec.in',
       process.env.CLIENT_URL
     ].filter(Boolean); // Remove undefined values
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
-      callback(null, true); // Allow all origins in development
+      console.log('CORS request from origin:', origin);
+      // In production, be more strict about CORS
+      if (process.env.NODE_ENV === 'production') {
+        // Only allow specific origins in production
+        callback(new Error('Not allowed by CORS'));
+      } else {
+        // Allow all origins in development
+        callback(null, true);
+      }
     }
   },
   credentials: true,
