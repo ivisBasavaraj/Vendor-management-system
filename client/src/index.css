@@ -1045,12 +1045,21 @@
     50% { transform: translateY(-15px) rotate(-3deg); }
   }
 
+  @keyframes float-fast {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(2deg); }
+  }
+
   .animate-float-slow {
     animation: float-slow 8s ease-in-out infinite;
   }
 
   .animate-float-medium {
     animation: float-medium 6s ease-in-out infinite;
+  }
+
+  .animate-float-fast {
+    animation: float-fast 4s ease-in-out infinite;
   }
 
   /* Enhanced document image styling */

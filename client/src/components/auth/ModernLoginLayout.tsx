@@ -106,21 +106,26 @@ const ModernLoginLayout: React.FC<ModernLoginLayoutProps> = ({
         </div>
         
         <div className="relative z-10 flex flex-col justify-between p-6 lg:p-8 text-white w-full h-full">
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="mb-6 flex flex-row items-center space-x-3">
+          {/* Logos at the top-left corner */}
+          <div className="flex-shrink-0 mb-8">
+            <div className="flex flex-row items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 shadow-lg w-fit">
               <img 
                 src={logoUrl} 
                 alt="IMTMA Logo" 
-                className="h-12 lg:h-16 w-auto filter drop-shadow-lg hover:scale-105 transition-transform duration-300"
-                style={{ maxWidth: '150px' }}
+                className="h-10 lg:h-12 w-auto filter drop-shadow-lg hover:scale-105 transition-transform duration-300"
+                style={{ maxWidth: '120px' }}
               />
+              <div className="w-px h-8 bg-white/30"></div>
               <img 
                 src="https://www.biec.in/images/biec-black.png" 
                 alt="BIEC Logo" 
-                className="h-12 lg:h-16 w-auto filter drop-shadow-lg hover:scale-105 transition-transform duration-300"
-                style={{ maxWidth: '150px' }}
+                className="h-10 lg:h-12 w-auto filter drop-shadow-lg hover:scale-105 transition-transform duration-300"
+                style={{ maxWidth: '120px' }}
               />
             </div>
+          </div>
+          
+          <div className="flex-1 flex flex-col justify-center">
             <motion.div
               key="left-content"
               initial="hidden"
