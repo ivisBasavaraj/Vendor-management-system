@@ -6,9 +6,6 @@ import apiService from '../../utils/api';
 import { getMimeTypeFromFileName } from '../../utils/mimeTypes';
 import { format, parseISO } from 'date-fns';
 import { generateVerificationReport, generateComplianceVerificationReport, preloadLogos, clearLogoCache } from '../../utils/pdfUtils';
-
-// Define API_PREFIX for logging purposes
-const API_PREFIX = '/api';
 import {
   DocumentTextIcon,
   ArrowDownTrayIcon,
@@ -35,6 +32,9 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import Select from '../../components/ui/Select';
+
+// Define API_PREFIX for logging purposes
+const API_PREFIX = '/api';
 
 interface Vendor {
   _id: string;
@@ -123,6 +123,105 @@ const VendorDocumentsPage: React.FC = () => {
   const [complianceStatus, setComplianceStatus] = useState('');
   const [complianceRemarks, setComplianceRemarks] = useState('');
 
+  // Fetch vendor and documents data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!vendorId) {
+        console.error('No vendorId provided in URL parameters');
+        return;
+      }
+      
+      // Wait for user to be loaded before proceeding
+      if (!user) {
+        console.log('User not loaded yet, waiting...');
+        return;
+      }
+      
+      console.log('Fetching data for vendor ID:', vendorId);
+      
+      // Clear cache and preload logos for PDF generation
+      clearLogoCache();
+      preloadLogos().catch(error => console.warn('Failed to preload logos:', error));
+
+      await refreshData();
+    };
+
+    fetchData();
+  }, [vendorId, user]);
+
+  // Auto-refresh when page regains focus (user comes back to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && vendorId) {
+        console.log('Page regained focus, refreshing data...');
+        refreshData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [vendorId]);
+
+  // Filter submissions based on search query, status, and date filters
+  useEffect(() => {
+    let filteredSubs = [...submissions];
+    
+    // Apply filters to submissions
+    filteredSubs = filteredSubs.map(submission => {
+      let filteredDocs = [...submission.documents];
+      
+      // Apply search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filteredDocs = filteredDocs.filter(doc => 
+          doc.title.toLowerCase().includes(query) || 
+          doc.documentType.toLowerCase().includes(query)
+        );
+      }
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filteredDocs = filteredDocs.filter(doc => doc.status === statusFilter);
+      }
+      
+      // Apply date filters
+      if (filterOptions.year && filterOptions.year !== 0) {
+        filteredDocs = filteredDocs.filter(doc => {
+          const docDate = new Date(doc.submissionDate);
+          return docDate.getFullYear() === filterOptions.year;
+        });
+      }
+      
+      if (filterOptions.month && filterOptions.month !== 'all') {
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+        
+        filteredDocs = filteredDocs.filter(doc => {
+          const docDate = new Date(doc.submissionDate);
+          return docDate.getMonth() === monthMap[filterOptions.month];
+        });
+      }
+      
+      // Filter out compliance certificates from the filtered documents
+      const nonComplianceDocs = filteredDocs.filter((doc: Document) => doc.documentType !== 'COMPLIANCE_CERTIFICATE');
+      
+      return {
+        ...submission,
+        documents: nonComplianceDocs
+      };
+    }).filter(submission => submission.documents.length > 0); // Only keep submissions with documents after filtering
+    
+    setFilteredSubmissions(filteredSubs);
+    
+    // Also update filtered documents for compatibility
+    const flatFiltered = filteredSubs.flatMap(sub => sub.documents);
+    setFilteredDocuments(flatFiltered);
+  }, [submissions, searchQuery, statusFilter, filterOptions]);
 
   // Only consultants and admins can access this page
   if (!user || (user.role !== 'consultant' && user.role !== 'admin')) {
@@ -174,6 +273,8 @@ const VendorDocumentsPage: React.FC = () => {
             setVendor(vendorData);
           }
         }
+      } else {
+        setError('Failed to load vendor details');
       }
 
       // Fetch vendor documents using the document-submissions API
@@ -302,38 +403,15 @@ const VendorDocumentsPage: React.FC = () => {
         }).filter(Boolean);
         
         // Also maintain flattened documents for compatibility with existing functions
-        const flatDocuments = transformedSubmissions.flatMap((sub: Submission) => sub.documents);
-        
-        // Deduplicate documents by ID to prevent counting duplicates
-        const uniqueDocuments = flatDocuments.filter((doc: Document, index: number, self: Document[]) => 
-          index === self.findIndex((d: Document) => d._id === doc._id)
-        );
-        
-        console.log('Refresh - Document deduplication:', {
-          originalCount: flatDocuments.length,
-          uniqueCount: uniqueDocuments.length,
-          duplicatesRemoved: flatDocuments.length - uniqueDocuments.length
-        });
+        const allDocuments = transformedSubmissions.flatMap((sub: any) => sub.documents);
         
         setSubmissions(transformedSubmissions);
         setFilteredSubmissions(transformedSubmissions);
-        setDocuments(uniqueDocuments);
-        setFilteredDocuments(uniqueDocuments);
-        
-        // Debug refresh data
-        console.log('Refresh - Document analysis:', {
-          total: uniqueDocuments.length,
-          statusBreakdown: uniqueDocuments.reduce((acc: any, doc: Document) => {
-            acc[doc.status] = (acc[doc.status] || 0) + 1;
-            return acc;
-          }, {}),
-          documents: uniqueDocuments.map((doc: Document) => ({
-            id: doc._id,
-            title: doc.title,
-            status: doc.status
-          }))
-        });
-        console.log('Data refreshed successfully');
+        setDocuments(allDocuments);
+        setFilteredDocuments(allDocuments);
+      } else {
+        console.error('Failed to fetch documents:', documentsResponse.data.message);
+        setError('Failed to load documents');
       }
     } catch (err: any) {
       console.error('Error refreshing data:', err);
@@ -367,616 +445,63 @@ const VendorDocumentsPage: React.FC = () => {
       }
     }
     
-    // If we found invalid documents, update the state
     if (invalidDocuments.length > 0) {
-      console.log(`Found ${invalidDocuments.length} stale documents out of ${documentsList.length} total`);
+      console.log(`Found ${invalidDocuments.length} stale documents, updating state...`);
+      
+      // Update submissions by removing invalid documents
+      const updatedSubmissions = submissions.map(submission => ({
+        ...submission,
+        documents: submission.documents.filter(doc => 
+          validDocuments.some(validDoc => validDoc._id === doc._id)
+        )
+      })).filter(submission => submission.documents.length > 0);
+      
+      setSubmissions(updatedSubmissions);
+      setFilteredSubmissions(updatedSubmissions);
       setDocuments(validDocuments);
       setFilteredDocuments(validDocuments.filter(doc => 
-        (statusFilter === 'all' || doc.status === statusFilter) &&
-        (doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-         doc.documentType.toLowerCase().includes(searchQuery.toLowerCase()))
+        filteredDocuments.some(filteredDoc => filteredDoc._id === doc._id)
       ));
-      
-      // Show a notification to the user
-      alert(`${invalidDocuments.length} document(s) that no longer exist in the database have been removed from the view.`);
     }
+    
+    return validDocuments;
   };
 
-  // Fetch vendor and documents data
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!vendorId) {
-        console.error('No vendorId provided in URL parameters');
-        return;
-      }
-      
-      // Wait for user to be loaded before proceeding
-      if (!user) {
-        console.log('User not loaded yet, waiting...');
-        return;
-      }
-      
-      console.log('Fetching data for vendor ID:', vendorId);
-      
-      // Clear cache and preload logos for PDF generation
-      clearLogoCache();
-      preloadLogos().catch(error => console.warn('Failed to preload logos:', error));
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch vendor details
-        const vendorResponse = await apiService.users.getById(vendorId);
-        if (vendorResponse.data.success) {
-          const vendorData = vendorResponse.data.data;
-          
-          // Check if this vendor is assigned to the current consultant
-          const assignedConsultantId = typeof vendorData.assignedConsultant === 'object' 
-            ? vendorData.assignedConsultant?._id || vendorData.assignedConsultant?.id
-            : vendorData.assignedConsultant;
-          
-          const currentUserId = user?._id || user?.id;
-          
-          console.log('Permission check:', {
-            vendorId: vendorData._id,
-            vendorName: vendorData.name,
-            assignedConsultantId,
-            currentUserId,
-            userRole: user?.role,
-            assignedConsultantObject: vendorData.assignedConsultant
-          });
-          
-          if (assignedConsultantId && assignedConsultantId === currentUserId) {
-            console.log('Permission granted: Vendor is assigned to current consultant');
-            setVendor(vendorData);
-          } else {
-            // Check if the user is an admin (admins can view all vendors)
-            if (user?.role !== 'admin') {
-              console.log('Permission denied: Vendor not assigned to current consultant and user is not admin');
-              setError('You do not have permission to view this vendor');
-              setLoading(false);
-              return;
-            } else {
-              // Admin can view all vendors
-              console.log('Permission granted: User is admin');
-              setVendor(vendorData);
-            }
-          }
-        } else {
-          setError('Failed to load vendor details');
-        }
-
-        // Fetch vendor documents using the document-submissions API
-        const documentsResponse = await apiService.documents.getVendorSubmissions({ 
-          vendorId: vendorId,
-          consultantId: user?.id, // Only get documents for vendors assigned to this consultant
-          checkAssignment: true // Add a flag to tell the API to check the assignment
-        });
-        
-        if (documentsResponse.data.success) {
-          // Define interfaces for the API response
-          interface SubmissionFile {
-            _id: string;
-            fileName: string;
-            filePath: string;
-            fileType: string;
-            uploadDate: string;
-          }
-          
-          interface SubmissionDocument {
-            _id: string;
-            documentName: string;
-            documentType: string;
-            status: string;
-            reviewNotes?: string;
-            files?: SubmissionFile[];
-            // Some APIs might include these properties directly on the document
-            filePath?: string;
-            fileName?: string;
-            fileType?: string;
-          }
-          
-          interface Submission {
-            _id: string;
-            submissionDate: string;
-            documents: SubmissionDocument[];
-          }
-          
-          // Log the API response for debugging
-          console.log('Document submissions API response:', documentsResponse.data);
-          
-          // Helper function to ensure valid dates - preserve original dates when possible
-          const ensureValidDate = (dateStr: string | undefined) => {
-            console.log('fetchData ensureValidDate input:', dateStr, 'type:', typeof dateStr);
-            if (!dateStr) {
-              console.log('Date string is empty, returning null for better handling');
-              return null; // Return null instead of current date
-            }
-            
-            // Try to parse the date
-            const date = new Date(dateStr);
-            
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-              console.log('Invalid date detected:', dateStr, 'returning null');
-              return null; // Return null instead of current date
-            }
-            
-            console.log('Valid date found:', dateStr, 'parsed as:', date.toISOString());
-            return dateStr;
-          };
-          
-          // Transform the submissions data to grouped submissions
-          const transformedSubmissions = documentsResponse.data.data.map((submission: any) => {
-            console.log('Processing submission with date fields:', {
-              _id: submission._id,
-              submissionDate: submission.submissionDate,
-              createdAt: submission.createdAt,
-              lastModifiedDate: submission.lastModifiedDate
-            });
-            
-            // Check if submission has documents
-            if (!submission.documents || submission.documents.length === 0) {
-              console.warn('Submission has no documents:', submission);
-              return null;
-            }
-            
-            const transformedDocuments = submission.documents.map((doc: any) => {
-              // Log all available fields in the document for debugging
-              console.log(`Document ${doc.documentName} fields:`, {
-                reviewNotes: doc.reviewNotes,
-                consultantRemarks: doc.consultantRemarks,
-                remarks: doc.remarks,
-                notes: doc.notes,
-                status: doc.status
-              });
-              
-              // Normalize the status to ensure it matches our expected values
-              let normalizedStatus = (doc.status || 'pending').toLowerCase().trim();
-              
-              // Comprehensive status normalization
-              if (normalizedStatus === 'review' || normalizedStatus === 'in_review' || normalizedStatus === 'under_review') {
-                normalizedStatus = 'under_review';
-              } else if (normalizedStatus === 'submitted' || normalizedStatus === 'new' || normalizedStatus === '' || 
-                         normalizedStatus === 'upload' || normalizedStatus === 'uploaded' || !doc.status) {
-                normalizedStatus = 'pending';
-              } else if (normalizedStatus === 'approve' || normalizedStatus === 'accept' || normalizedStatus === 'accepted') {
-                normalizedStatus = 'approved';
-              } else if (normalizedStatus === 'reject' || normalizedStatus === 'deny' || normalizedStatus === 'denied') {
-                normalizedStatus = 'rejected';
-              } else if (normalizedStatus === 'resubmit' || normalizedStatus === 're-submit' || normalizedStatus === 'resubmission') {
-                normalizedStatus = 'resubmitted';
-              }
-              
-              console.log('Document', doc.documentName, 'final normalized status:', normalizedStatus);
-              
-              // Log the document files for debugging
-              console.log(`Processing document ${doc.documentName}. Files:`, doc.files);
-              
-              // Process files with detailed logging
-              let processedFiles: SubmissionFile[] = [];
-              
-              if (doc.files && doc.files.length > 0) {
-                processedFiles = doc.files.map((file: SubmissionFile, index: number) => {
-                  console.log(`Processing file ${index} for document ${doc.documentName}:`, file);
-                  
-                  // Check if filePath exists and is valid
-                  if (!file.filePath) {
-                    console.warn(`File ${index} has no filePath:`, file);
-                  }
-                  
-                  return {
-                    _id: file._id || 'file-' + Math.random().toString(36).substr(2, 9),
-                    fileName: file.fileName || 'unknown.pdf',
-                    filePath: file.filePath || '',
-                    fileType: file.fileType || 'application/pdf',
-                    uploadDate: ensureValidDate(file.uploadDate || submission.createdAt || submission.submissionDate) || new Date().toISOString()
-                  };
-                });
-              } else {
-                // If no files array or empty array, create a placeholder file
-                console.warn(`Document ${doc.documentName} has no files. Creating placeholder.`);
-                
-                // Check if the document itself has a filePath property (some APIs structure it this way)
-                if (doc.filePath && typeof doc.filePath === 'string') {
-                  processedFiles = [{
-                    _id: 'file-' + Math.random().toString(36).substr(2, 9),
-                    fileName: (doc.fileName as string) || doc.documentName || 'document.pdf',
-                    filePath: doc.filePath,
-                    fileType: (doc.fileType as string) || 'application/pdf',
-                    uploadDate: ensureValidDate(submission.createdAt || submission.submissionDate) || new Date().toISOString()
-                  }];
-                } else {
-                  // Create an empty placeholder
-                  processedFiles = [];
-                }
-              }
-              
-              // Log the processed files
-              console.log(`Processed files for document ${doc.documentName}:`, processedFiles);
-              
-              const documentObj = {
-                _id: doc._id,
-                title: doc.documentName || 'Unnamed Document',
-                documentType: doc.documentType || 'Unknown Type',
-                submissionDate: ensureValidDate(submission.createdAt || submission.submissionDate) || new Date().toISOString(),
-                status: normalizedStatus,
-                fileCount: processedFiles.length || 0,
-                vendorId: vendorId || '',
-                submissionId: submission._id,
-                reviewNotes: doc.reviewNotes || doc.consultantRemarks || doc.remarks || doc.notes || '',
-                files: processedFiles
-              };
-              
-              console.log('Transformed document:', documentObj);
-              return documentObj;
-            });
-
-            // Filter out compliance certificate documents from this submission
-            const nonComplianceDocuments = transformedDocuments.filter((doc: any) => {
-              const docType = (doc.documentType || '').toUpperCase().trim();
-              const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
-                                  docType === 'COMPLIANCE CERTIFICATE' ||
-                                  docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
-
-              return !isCompliance;
-            });
-            
-            // Only return submission if it has non-compliance documents
-            if (nonComplianceDocuments.length === 0) {
-              return null;
-            }
-
-            return {
-              _id: submission._id,
-              submissionDate: ensureValidDate(submission.createdAt || submission.submissionDate) || new Date().toISOString(),
-              documents: nonComplianceDocuments
-            };
-          }).filter(Boolean);
-          
-          // Also maintain flattened documents for compatibility with existing functions
-          const flatDocuments = transformedSubmissions.flatMap((sub: Submission) => sub.documents);
-          
-          // Deduplicate documents by ID to prevent counting duplicates
-          const uniqueDocuments = flatDocuments.filter((doc: Document, index: number, self: Document[]) => 
-            index === self.findIndex((d: Document) => d._id === doc._id)
-          );
-          
-          console.log('Document deduplication:', {
-            originalCount: flatDocuments.length,
-            uniqueCount: uniqueDocuments.length,
-            duplicatesRemoved: flatDocuments.length - uniqueDocuments.length
-          });
-          
-          // Use unique documents for all subsequent operations
-          console.log('Document statuses:', uniqueDocuments.map((doc: Document) => doc.status));
-          console.log('Detailed document analysis:', {
-            total: uniqueDocuments.length,
-            statusBreakdown: uniqueDocuments.reduce((acc: any, doc: Document) => {
-              acc[doc.status] = (acc[doc.status] || 0) + 1;
-              return acc;
-            }, {}),
-            documents: uniqueDocuments.map((doc: Document) => ({
-              id: doc._id,
-              title: doc.title,
-              status: doc.status,
-              submissionId: doc.submissionId
-            }))
-          });
-          
-          setSubmissions(transformedSubmissions);
-          setFilteredSubmissions(transformedSubmissions);
-          setDocuments(uniqueDocuments);
-          setFilteredDocuments(uniqueDocuments);
-          
-          // Clean up stale documents after a short delay to allow the UI to render first
-          setTimeout(() => {
-            cleanupStaleDocuments(uniqueDocuments);
-          }, 2000);
-        } else {
-          setError('Failed to load vendor documents');
-        }
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-        const errorMessage = err.response?.data?.message || 'Failed to load data';
-        console.log('Error details:', {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          message: err.message
-        });
-        setError(`${errorMessage} (${err.response?.status || 'Unknown error'})`);
-        
-        // Log the API endpoints we're trying to use
-        console.log('API endpoints being used:', {
-          vendorDetails: `${API_PREFIX}/users/${vendorId}`,
-          vendorDocuments: `${API_PREFIX}/document-submissions/vendor/submissions?vendorId=${vendorId}`
-        });
-
-        // Use mock data for development if API fails
-        if (!vendor) {
-          setVendor({
-            _id: vendorId || '1',
-            name: 'John Smith',
-            email: 'john@acmecorp.com',
-            company: 'Acme Corporation'
-          });
-        }
-
-        if (documents.length === 0) {
-          const mockSubmissions: Submission[] = [
-            {
-              _id: 'SUB001',
-              submissionDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-              documents: [
-                {
-                  _id: '1',
-                  title: 'Tax Compliance Certificate',
-                  documentType: 'Tax Document',
-                  submissionDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-                  status: 'pending',
-                  fileCount: 1,
-                  vendorId: vendorId || '1',
-                  submissionId: 'SUB001',
-                  files: [
-                    {
-                      _id: 'f1',
-                      fileName: 'tax_certificate_2023.pdf',
-                      filePath: '/uploads/tax_certificate_2023.pdf',
-                      fileType: 'application/pdf',
-                      uploadDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              _id: 'SUB002',
-              submissionDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-              documents: [
-                {
-                  _id: '2',
-                  title: 'Business Registration',
-                  documentType: 'Legal Document',
-                  submissionDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-                  status: 'under_review',
-                  fileCount: 2,
-                  vendorId: vendorId || '1',
-                  submissionId: 'SUB002',
-                  files: [
-                    {
-                      _id: 'f2',
-                      fileName: 'business_registration.pdf',
-                      filePath: '/uploads/business_registration.pdf',
-                      fileType: 'application/pdf',
-                      uploadDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-                    },
-                    {
-                      _id: 'f3',
-                      fileName: 'business_license.pdf',
-                      filePath: '/uploads/business_license.pdf',
-                      fileType: 'application/pdf',
-                      uploadDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              _id: 'SUB003',
-              submissionDate: new Date().toISOString(), // Today
-              documents: [
-                {
-                  _id: '3',
-                  title: 'Financial Statement',
-                  documentType: 'Financial Document',
-                  submissionDate: new Date().toISOString(),
-                  status: 'approved',
-                  fileCount: 1,
-                  vendorId: vendorId || '1',
-                  submissionId: 'SUB003',
-                  files: [
-                    {
-                      _id: 'f4',
-                      fileName: 'financial_statement_2023.pdf',
-                      filePath: '/uploads/financial_statement_2023.pdf',
-                      fileType: 'application/pdf',
-                      uploadDate: new Date().toISOString()
-                    }
-                  ]
-                }
-              ]
-            }
-          ];
-          
-          const mockDocuments = mockSubmissions.flatMap(sub => sub.documents);
-          
-          setSubmissions(mockSubmissions);
-          setFilteredSubmissions(mockSubmissions);
-          setDocuments(mockDocuments);
-          setFilteredDocuments(mockDocuments);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [vendorId, user]);
-
-  // Auto-refresh when page regains focus (user comes back to tab)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && vendorId) {
-        console.log('Page regained focus, refreshing data...');
-        refreshData();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [vendorId]);
-
-  // Filter submissions based on search query, status, and date filters
-  useEffect(() => {
-    let filteredSubs = [...submissions];
-    
-    // Apply filters to submissions
-    filteredSubs = filteredSubs.map(submission => {
-      let filteredDocs = [...submission.documents];
-      
-      // Apply search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filteredDocs = filteredDocs.filter(doc => 
-          doc.title.toLowerCase().includes(query) || 
-          doc.documentType.toLowerCase().includes(query)
-        );
-      }
-      
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        filteredDocs = filteredDocs.filter(doc => doc.status === statusFilter);
-      }
-      
-      // Apply date filters
-      if (filterOptions.year && filterOptions.year !== 0) {
-        filteredDocs = filteredDocs.filter(doc => {
-          const docDate = new Date(doc.submissionDate);
-          return docDate.getFullYear() === filterOptions.year;
-        });
-      }
-      
-      if (filterOptions.month && filterOptions.month !== 'all') {
-        const monthMap: { [key: string]: number } = {
-          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-        };
-        
-        filteredDocs = filteredDocs.filter(doc => {
-          const docDate = new Date(doc.submissionDate);
-          return docDate.getMonth() === monthMap[filterOptions.month];
-        });
-      }
-      
-      // Filter out compliance certificates from the filtered documents
-      const nonComplianceDocs = filteredDocs.filter((doc: Document) => {
-        const docType = (doc.documentType || '').toUpperCase().trim();
-        const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
-                            docType === 'COMPLIANCE CERTIFICATE' ||
-                            docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
-        return !isCompliance;
-      });
-      
-      return {
-        ...submission,
-        documents: nonComplianceDocs
-      };
-    }).filter(submission => submission.documents.length > 0); // Only keep submissions with documents after filtering
-    
-    setFilteredSubmissions(filteredSubs);
-    
-    // Also update filtered documents for compatibility
-    const flatFiltered = filteredSubs.flatMap(sub => sub.documents);
-    setFilteredDocuments(flatFiltered);
-  }, [submissions, searchQuery, statusFilter, filterOptions]);
-
-  // Handle document view - fetch fresh document data
-  const handleViewDocument = async (document: Document) => {
-    try {
-      console.log('Fetching fresh document data for view:', document._id);
-      
-      // Try to fetch the latest version of this document
-      if (document.submissionId) {
-        // Fetch the submission to get the latest document data
-        const submissionResponse = await apiService.documents.getSubmissionById(document.submissionId);
-        
-        if (submissionResponse.data.success) {
-          const submission = submissionResponse.data.data;
-          
-          // Find the specific document in the submission
-          const latestDoc = submission.documents.find((doc: any) => doc._id === document._id);
-          
-          if (latestDoc) {
-            // Transform the latest document data to match our interface
-            const transformedDoc = {
-              _id: latestDoc._id,
-              title: latestDoc.documentName || document.title,
-              documentType: latestDoc.documentType || document.documentType,
-              submissionDate: submission.submissionDate,
-              status: latestDoc.status || document.status,
-              fileCount: latestDoc.files ? latestDoc.files.length : (latestDoc.filePath ? 1 : 0),
-              vendorId: document.vendorId,
-              submissionId: document.submissionId,
-              reviewNotes: latestDoc.reviewNotes || latestDoc.consultantRemarks || document.reviewNotes,
-              files: latestDoc.files || (latestDoc.filePath ? [{
-                _id: 'file-' + Math.random().toString(36).substr(2, 9),
-                fileName: latestDoc.fileName || latestDoc.documentName || document.title,
-                filePath: latestDoc.filePath,
-                fileType: latestDoc.fileType || getMimeTypeFromFileName(latestDoc.filePath || latestDoc.fileName || ''),
-                uploadDate: submission.submissionDate
-              }] : [])
-            };
-            
-            console.log('Using fresh document data:', transformedDoc);
-            setSelectedDocument(transformedDoc);
-            setShowDocumentModal(true);
-            return;
-          }
-        }
-      }
-      
-      // Fallback to cached document data if fresh fetch fails
-      console.log('Using cached document data');
-      setSelectedDocument(document);
-      setShowDocumentModal(true);
-    } catch (error) {
-      console.error('Error fetching fresh document data:', error);
-      // Fallback to cached document data
-      setSelectedDocument(document);
-      setShowDocumentModal(true);
-    }
+  // Helper function to get year options for filter
+  const getYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    return [
+      { value: 0, label: 'All Years' },
+      { value: currentYear - 1, label: `${currentYear - 1}` },
+      { value: currentYear, label: `${currentYear}` },
+      { value: currentYear + 1, label: `${currentYear + 1}` }
+    ];
   };
 
-  // Verify document exists before showing approval modal
+  // Helper function to get month options for filter
+  const getMonthOptions = () => {
+    return [
+      { value: 'all', label: 'All Months' },
+      { value: 'Jan', label: 'January' },
+      { value: 'Feb', label: 'February' },
+      { value: 'Mar', label: 'March' },
+      { value: 'Apr', label: 'April' },
+      { value: 'May', label: 'May' },
+      { value: 'Jun', label: 'June' },
+      { value: 'Jul', label: 'July' },
+      { value: 'Aug', label: 'August' },
+      { value: 'Sep', label: 'September' },
+      { value: 'Oct', label: 'October' },
+      { value: 'Nov', label: 'November' },
+      { value: 'Dec', label: 'December' }
+    ];
+  };
+
+  // Function to verify if a document still exists in the database
   const verifyDocumentExists = async (document: Document): Promise<boolean> => {
     try {
-      console.log(`Verifying document exists: ${document._id}`);
-      
-      // First try the document-submissions API if we have a submissionId
-      if (document.submissionId) {
-        try {
-          // The checkDocumentExists function returns a boolean directly
-          const exists = await apiService.documents.checkDocumentExists(document._id);
-          console.log(`Document exists check result:`, exists);
-          return exists;
-        } catch (error) {
-          console.error('Error checking document existence in document-submissions:', error);
-          // Fall through to try the legacy API
-        }
-      }
-      
-      // Try the legacy documents API
-      try {
-        // Use our new debug endpoint to check if the document exists
-        // Make sure to use the full API URL with the API_PREFIX
-        const response = await fetch(`${API_PREFIX}/documents/debug/${document._id}`);
-        if (!response.ok) {
-          console.log(`Debug endpoint returned status: ${response.status}`);
-          return false;
-        }
-        
-        const data = await response.json();
-        console.log(`Debug endpoint response:`, data);
-        return data.success;
-      } catch (error) {
-        console.error('Error checking document existence in documents:', error);
-        return false;
-      }
+      const response = await apiService.documents.getById(document._id);
+      return response.data.success;
     } catch (error) {
       console.error('Error verifying document existence:', error);
       return false;
@@ -990,19 +515,15 @@ const VendorDocumentsPage: React.FC = () => {
     
     // Verify document exists before showing approval modal
     const exists = await verifyDocumentExists(document);
-    
     if (!exists) {
+      setError('Document no longer exists. Please refresh the page.');
       setProcessingApproval(false);
-      alert(`Document with ID ${document._id} no longer exists in the database. The page will refresh to show current data.`);
-      
-      // Refresh the documents list
-      window.location.reload();
       return;
     }
-    
-    // Document exists, proceed with approval
+
     setSelectedDocument(document);
     setApprovalStatus('approved');
+    setRemarks('');
     setShowApprovalModal(true);
     setProcessingApproval(false);
   };
@@ -1014,177 +535,122 @@ const VendorDocumentsPage: React.FC = () => {
     
     // Verify document exists before showing rejection modal
     const exists = await verifyDocumentExists(document);
-    
     if (!exists) {
+      setError('Document no longer exists. Please refresh the page.');
       setProcessingApproval(false);
-      alert(`Document with ID ${document._id} no longer exists in the database. The page will refresh to show current data.`);
-      
-      // Refresh the documents list
-      window.location.reload();
       return;
     }
-    
-    // Document exists, proceed with rejection
+
     setSelectedDocument(document);
     setApprovalStatus('rejected');
+    setRemarks('');
     setShowApprovalModal(true);
     setProcessingApproval(false);
   };
 
-  // Submit document approval/rejection
+  // Submit approval/rejection
   const handleSubmitApproval = async () => {
-    if (!selectedDocument || !approvalStatus) return;
-    
-    // Validate that remarks are provided
-    if (!remarks.trim()) {
-      alert('Please provide remarks before approving or rejecting the document.');
+    if (!selectedDocument || !approvalStatus || !remarks.trim()) {
       return;
     }
-    
+
     setProcessingApproval(true);
-    
+
     try {
-      let response;
-      // Properly type the apiError variable as AxiosError
-      let apiError: import('axios').AxiosError | null = null;
-      
-      // First try using the new document-submissions API
-      if (selectedDocument.submissionId) {
-        console.log('Trying new API: Updating document status with:', {
-          submissionId: selectedDocument.submissionId,
-          documentId: selectedDocument._id,
-          status: approvalStatus,
-          remarks: remarks
-        });
-        
-        try {
-          // Use the new updateDocumentStatus method which requires both submissionId and documentId
-          response = await apiService.documents.updateDocumentStatus(
-            selectedDocument.submissionId,
-            selectedDocument._id,
-            {
-              status: approvalStatus,
-              remarks: remarks
-            }
-          );
-          console.log('New API response:', response);
-        } catch (error) {
-          const newApiError = error as import('axios').AxiosError;
-          console.error('Error with new API, falling back to legacy endpoint:', newApiError);
-          apiError = newApiError;
-          // If the new API fails, we'll fall back to the legacy API
-          response = null;
-        }
-      }
-      
-      // If the new API failed or there's no submissionId, try the legacy API
-      if (!response) {
-        console.log('Trying legacy API: Updating document status with:', {
-          documentId: selectedDocument._id,
-          status: approvalStatus,
-          remarks: remarks
-        });
-        
-        // Fall back to the legacy updateStatus method
-        try {
-          response = await apiService.documents.updateStatus(
-            selectedDocument._id,
-            approvalStatus,
-            remarks
-          );
-          console.log('Legacy API response:', response);
-        } catch (error) {
-          const legacyApiError = error as import('axios').AxiosError;
-          console.error('Error with legacy API as well:', legacyApiError);
-          apiError = legacyApiError;
-          
-          // Don't throw here, handle the error gracefully
-          response = null;
-        }
-      }
-      
-      // If both APIs failed, check if we can update the UI optimistically
-      if (!response) {
-        console.log('Both APIs failed. Updating UI optimistically and showing error message.');
-        
-        // Log detailed error information for debugging
-        if (apiError) {
-          console.error('API Error Details:', {
-            status: apiError.response?.status,
-            statusText: apiError.response?.statusText,
-            data: apiError.response?.data,
-            message: apiError.message,
-            documentId: selectedDocument._id,
-            submissionId: selectedDocument.submissionId
-          });
-        }
-        
-        // Update the UI optimistically
-        const updatedDocuments = documents.map(doc => {
-          if (doc._id === selectedDocument._id) {
-            return {
-              ...doc,
-              status: approvalStatus,
-              reviewNotes: remarks
-            };
-          }
-          return doc;
-        });
-        
+      const response = await apiService.documents.updateStatus(selectedDocument._id, approvalStatus, remarks.trim());
+
+      if (response.data.success) {
+        // Update the document in the local state
+        const updatedSubmissions = submissions.map(submission => ({
+          ...submission,
+          documents: submission.documents.map(doc =>
+            doc._id === selectedDocument._id
+              ? { ...doc, status: approvalStatus, reviewNotes: remarks.trim() }
+              : doc
+          )
+        }));
+
+        setSubmissions(updatedSubmissions);
+        setFilteredSubmissions(updatedSubmissions);
+
+        // Also update the flattened documents
+        const updatedDocuments = documents.map(doc =>
+          doc._id === selectedDocument._id
+            ? { ...doc, status: approvalStatus, reviewNotes: remarks.trim() }
+            : doc
+        );
         setDocuments(updatedDocuments);
-        setFilteredDocuments(updatedDocuments.filter(doc => 
-          (statusFilter === 'all' || doc.status === statusFilter) &&
-          (doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           doc.documentType.toLowerCase().includes(searchQuery.toLowerCase()))
-        ));
-        
+        setFilteredDocuments(updatedDocuments);
+
         setShowApprovalModal(false);
-        setRemarks('');
+        setSelectedDocument(null);
         setApprovalStatus(null);
-        
-        // Show warning message
-        alert(`UI updated to show document as ${approvalStatus === 'approved' ? 'approved' : 'rejected'}, but there was an error saving to the server. The change may not persist after page refresh.`);
-        return;
-      }
-      
-      if (response && response.data.success) {
-        // Update the document status in the local state
-        const updatedDocuments = documents.map(doc => {
-          if (doc._id === selectedDocument._id) {
-            return {
-              ...doc,
-              status: approvalStatus,
-              reviewNotes: remarks
-            };
-          }
-          return doc;
-        });
-        
-        setDocuments(updatedDocuments);
-        setFilteredDocuments(updatedDocuments.filter(doc => 
-          (statusFilter === 'all' || doc.status === statusFilter) &&
-          (doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           doc.documentType.toLowerCase().includes(searchQuery.toLowerCase()))
-        ));
-        
-        setShowApprovalModal(false);
         setRemarks('');
-        setApprovalStatus(null);
-        
-        // Refresh data to update submission status and show report button if all documents are approved
-        refreshData();
-        
-        // Show success message
-        alert(`Document has been ${approvalStatus === 'approved' ? 'approved' : 'rejected'} successfully.`);
-      } else if (response) {
-        console.error('Failed to update document status:', response.data);
-        alert('Failed to update document status. Please try again later.');
+      } else {
+        setError('Failed to update document status');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating document status:', error);
-      alert('Failed to update document status. Please try again later.');
+      setError('Failed to update document status');
     } finally {
       setProcessingApproval(false);
+    }
+  };
+
+  // Handle file download
+  const handleDownloadFile = async (file: any) => {
+    try {
+      const response = await apiService.documents.downloadFile(file._id);
+      
+      // Create blob and download
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      setError('Failed to download file');
+    }
+  };
+
+  // Handle report generation
+  const handleGenerateReport = async () => {
+    if (!vendor) return;
+
+    setGeneratingReport(true);
+    setReportSuccess(null);
+    setReportError(null);
+
+    try {
+      const vendorData = {
+        name: vendor.name,
+        company: vendor.company,
+        email: vendor.email,
+        address: vendor.workLocation || ''
+      };
+
+      const documentData = documents.map(doc => ({
+        title: doc.title,
+        documentType: doc.documentType,
+        status: doc.status,
+        submissionDate: doc.submissionDate,
+        reviewNotes: doc.reviewNotes || '',
+        fileCount: doc.fileCount
+      }));
+
+      await generateVerificationReport(vendorData, documentData, `Document Verification Report - ${vendor.name}`);
+      setReportSuccess(true);
+    } catch (error: any) {
+      console.error('Error generating report:', error);
+      setReportError(error.message || 'Failed to generate report');
+      setReportSuccess(false);
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -1205,176 +671,6 @@ const VendorDocumentsPage: React.FC = () => {
     return filteredDocuments.length > 0 && filteredDocuments.every(doc => doc.status === 'approved');
   };
 
-  // Helper function to safely format dates
-  const safeFormatDate = (dateString: string | undefined, formatString: string): string => {
-    try {
-      console.log('Attempting to format date:', dateString);
-      
-      if (!dateString) {
-        console.warn('Date string is null or undefined');
-        return 'No Date Available';
-      }
-      
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date string:', dateString);
-        return 'Invalid Date Format';
-      }
-      
-      const formattedDate = format(date, formatString);
-      console.log('Successfully formatted date:', dateString, '->', formattedDate);
-      return formattedDate;
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
-      return 'Date Format Error';
-    }
-  };
-
-  // Reset filters
-  const resetFilters = () => {
-    setFilterOptions({
-      year: new Date().getFullYear(),
-      month: 'all',
-      status: 'all'
-    });
-    setStatusFilter('all');
-    setSearchQuery('');
-    setShowFilterModal(false);
-  };
-
-  // Apply filters
-  const applyFilters = () => {
-    setShowFilterModal(false);
-  };
-
-  // Generate PDF report for approved documents
-  const generateDocumentReport = async () => {
-    setGeneratingReport(true);
-    setReportSuccess(null);
-    setReportError(null);
-    
-    try {
-      // Filter only approved documents
-      const approvedDocs = documents.filter(doc => doc.status === 'approved');
-      
-      if (approvedDocs.length === 0) {
-        setReportError('No approved documents found to generate report');
-        setGeneratingReport(false);
-        return;
-      }
-      
-      // Prepare vendor data
-      const vendorData = {
-        name: vendor?.name || 'Unknown Vendor',
-        company: vendor?.company || 'Unknown Company',
-        email: vendor?.email || 'Unknown Email'
-      };
-      
-      // Log document data for debugging
-      console.log('General Report - Approved documents details:', approvedDocs.map(doc => ({
-        id: doc._id,
-        title: doc.title,
-        status: doc.status,
-        reviewNotes: doc.reviewNotes,
-        hasReviewNotes: !!doc.reviewNotes,
-        reviewNotesLength: doc.reviewNotes ? doc.reviewNotes.length : 0,
-        finalRemarks: doc.reviewNotes || 'No remarks provided'
-      })));
-      
-      console.log('Raw all approved documents data:', approvedDocs);
-      
-      // Generate the PDF using our utility function
-      const pdf = await generateVerificationReport(
-        vendorData,
-        approvedDocs.map(doc => ({
-          title: doc.title,
-          documentType: doc.documentType,
-          submissionDate: doc.submissionDate,
-          status: 'Approved',
-          remarks: doc.reviewNotes || 'No remarks provided'
-        })),
-        'Document Verification Report'
-      );
-      
-      // Save the PDF
-      pdf.save(`${vendor?.name || 'vendor'}_document_verification_report.pdf`);
-      
-      setReportSuccess(true);
-    } catch (error) {
-      console.error('Error generating PDF report:', error);
-      setReportError('Failed to generate PDF report');
-      setReportSuccess(false);
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
-  // Generate report for a specific submission
-  const handleGenerateSubmissionReport = async (submission: Submission) => {
-    setGeneratingReport(true);
-    setReportSuccess(null);
-    setReportError(null);
-    
-    try {
-      // All documents should be approved if this function is called
-      const approvedDocs = submission.documents.filter(doc => doc.status === 'approved');
-      
-      if (approvedDocs.length === 0) {
-        setReportError('No approved documents found in this submission');
-        setGeneratingReport(false);
-        return;
-      }
-      
-      // Prepare vendor data
-      const vendorData = {
-        name: vendor?.name || 'Unknown Vendor',
-        company: vendor?.company || 'Unknown Company',
-        email: vendor?.email || 'Unknown Email'
-      };
-      
-      // Log document data for debugging
-      console.log('Submission Report - Approved documents details:', approvedDocs.map(doc => ({
-        id: doc._id,
-        title: doc.title,
-        status: doc.status,
-        reviewNotes: doc.reviewNotes,
-        hasReviewNotes: !!doc.reviewNotes,
-        reviewNotesLength: doc.reviewNotes ? doc.reviewNotes.length : 0,
-        finalRemarks: doc.reviewNotes || 'No remarks provided'
-      })));
-      
-      console.log('Raw approved documents data:', approvedDocs);
-      
-      // Generate the PDF using our utility function
-      const pdf = await generateVerificationReport(
-        vendorData,
-        approvedDocs.map(doc => ({
-          title: doc.title,
-          documentType: doc.documentType,
-          submissionDate: doc.submissionDate,
-          status: 'Approved',
-          remarks: doc.reviewNotes || 'No remarks provided'
-        })),
-        `Document Verification Report - Submission ${submission._id.slice(-8).toUpperCase()}`
-      );
-      
-      // Save the PDF with submission ID
-      pdf.save(`${vendor?.name || 'vendor'}_submission_${submission._id.slice(-8)}_verification_report.pdf`);
-      
-      setReportSuccess(true);
-      
-      // Show success message
-      alert('Verification report generated successfully!');
-    } catch (error) {
-      console.error('Error generating submission PDF report:', error);
-      setReportError('Failed to generate submission PDF report');
-      setReportSuccess(false);
-      alert('Failed to generate verification report. Please try again.');
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
   // Generate compliance verification report for a specific submission
   const handleGenerateComplianceReport = async (submission: Submission) => {
     setGeneratingReport(true);
@@ -1382,18 +678,25 @@ const VendorDocumentsPage: React.FC = () => {
     setReportError(null);
     
     try {
-      // Prepare vendor data
+      if (!vendor) {
+        throw new Error('Vendor information not available');
+      }
+
+      // Debug: Log all vendor fields to see what's available
+      console.log('Vendor object for compliance report:', vendor);
+      console.log('Available vendor fields:', Object.keys(vendor));
+
       const vendorData = {
-        name: vendor?.name || 'Unknown Vendor',
-        company: vendor?.company || 'Unknown Company',
-        email: vendor?.email || 'Unknown Email',
-        address: vendor?.company || 'Address not specified',
-        workLocation: vendor?.workLocation || 'Not specified',
-        agreementPeriod: vendor?.agreementPeriod || 
-          (vendor?.contractStartDate && vendor?.contractEndDate ? 
+        name: vendor.name,
+        company: vendor.company,
+        email: vendor.email,
+        address: vendor.workLocation || '',
+        contractPeriod: (vendor.contractStartDate && vendor.contractEndDate ? 
             `${format(new Date(vendor.contractStartDate), 'MMM dd, yyyy')} - ${format(new Date(vendor.contractEndDate), 'MMM dd, yyyy')}` : 
-            'Not specified')
+            vendor.agreementPeriod || 'Not specified')
       };
+
+      console.log('Processed vendor data for PDF:', vendorData);
 
       // Calculate compliance metrics (excluding compliance certificates)
       const filteredDocuments = filterOutComplianceCertificates(submission.documents);
@@ -1402,85 +705,41 @@ const VendorDocumentsPage: React.FC = () => {
       const rejectedDocuments = filteredDocuments.filter(doc => doc.status === 'rejected').length;
       const pendingDocuments = filteredDocuments.filter(doc => doc.status === 'pending' || doc.status === 'under_review').length;
       
-      // Calculate compliance rate
-      const complianceRate = totalDocuments > 0 ? Math.round((approvedDocuments / totalDocuments) * 100) : 0;
-      
-      // Determine overall status
-      let overallStatus = 'In Progress';
-      if (approvedDocuments === totalDocuments) {
-        overallStatus = 'Fully Compliant';
-      } else if (rejectedDocuments > 0) {
-        overallStatus = 'Non-Compliant';
-      } else if (pendingDocuments > 0) {
-        overallStatus = 'Under Review';
-      }
-
-      // Check regulatory compliance based on document types (excluding compliance certificates)
-      const documentTypes = filteredDocuments.map(doc => doc.documentType);
       const complianceMetrics = {
-        totalRequired: totalDocuments,
-        totalSubmitted: totalDocuments,
-        approved: approvedDocuments,
-        rejected: rejectedDocuments,
-        pending: pendingDocuments,
-        complianceRate: complianceRate,
-        overallStatus: overallStatus,
-        hasESI: documentTypes.includes('ESI_REGISTRATION'),
-        hasPF: documentTypes.includes('PF_REGISTRATION'),
-        hasLabourWelfare: documentTypes.includes('LABOUR_WELFARE_FUND'),
-        hasInvoice: documentTypes.includes('INVOICE'),
-        hasContract: documentTypes.includes('CONTRACT'),
-        hasBankStatement: documentTypes.includes('BANK_STATEMENT'),
-        hasECR: documentTypes.includes('ECR'),
-        hasFormT: documentTypes.includes('FORM_T_MUSTER_ROLL'),
-        recommendations: [] as string[],
-        auditorName: user?.name || 'System Consultant',
-        auditReview: auditFindings || `Comprehensive review of ${totalDocuments} documents submitted for compliance verification. All documents have been evaluated against IMTMA standards and regulatory requirements.`,
-        remarks: complianceRemarks || (complianceRate === 100 ? 
-          'All submitted documents meet compliance requirements. Vendor maintains good documentation standards.' :
-          `${approvedDocuments} out of ${totalDocuments} documents approved. ${rejectedDocuments > 0 ? 'Some documents require resubmission.' : 'Pending documents under review.'}`)
+        totalDocuments,
+        approvedDocuments,
+        rejectedDocuments,
+        pendingDocuments,
+        complianceRate: totalDocuments > 0 ? Math.round((approvedDocuments / totalDocuments) * 100) : 0,
+        auditFindings: auditFindings.trim(),
+        auditReview: auditFindings.trim(),
+        complianceStatus: complianceStatus,
+        complianceRemarks: complianceRemarks.trim(),
+        remarks: complianceRemarks.trim(),
+        submissionDate: submission.submissionDate,
+        reviewDate: new Date().toISOString(),
+        reviewedBy: user?.name || 'Consultant',
+        auditorName: user?.name || 'System Consultant'
       };
 
-      // Add recommendations based on compliance status
-      if (complianceMetrics.complianceRate < 100) {
-        complianceMetrics.recommendations.push('Complete submission of all required documents');
-      }
-      
-      if (!complianceMetrics.hasESI) {
-        complianceMetrics.recommendations.push('Submit ESI Registration certificate');
-      }
-      
-      if (!complianceMetrics.hasPF) {
-        complianceMetrics.recommendations.push('Submit PF Registration certificate');
-      }
-
-      // Prepare submission data
       const submissionData = {
-        submissionId: submission._id,
-        submissionNumber: `SUB-${submission._id.slice(-8).toUpperCase()}`,
-        workLocation: vendor?.workLocation || 'Not specified',
-        locationOfWork: vendor?.workLocation || 'Not specified',
-        agreementPeriod: vendor?.agreementPeriod || 
-          (vendor?.contractStartDate && vendor?.contractEndDate ? 
+        _id: submission._id,
+        submissionDate: submission.submissionDate,
+        workLocation: vendor.workLocation || 'Not specified',
+        locationOfWork: vendor.workLocation || 'Not specified',
+        agreementPeriod: (vendor.contractStartDate && vendor.contractEndDate ? 
             `${format(new Date(vendor.contractStartDate), 'MMM dd, yyyy')} - ${format(new Date(vendor.contractEndDate), 'MMM dd, yyyy')}` : 
-            'Not specified'),
-        uploadPeriod: {
-          month: format(new Date(submission.submissionDate), 'MMMM'),
-          year: new Date(submission.submissionDate).getFullYear()
-        },
+            vendor.agreementPeriod || 'Not specified'),
+        month: format(new Date(submission.submissionDate), 'MMMM'),
+        year: format(new Date(submission.submissionDate), 'yyyy'),
         documents: filteredDocuments.map(doc => ({
-          documentName: doc.title,
+          _id: doc._id,
+          title: doc.title,
           documentType: doc.documentType,
-          isMandatory: true,
-          status: doc.status,
           submissionDate: doc.submissionDate,
-          reviewNotes: doc.reviewNotes || 'No specific notes',
-          consultantRemarks: doc.consultantRemarks || '',
-          remarks: doc.remarks || '',
-          consultantNotes: doc.consultantNotes || '',
-          approvalRemarks: doc.approvalRemarks || '',
-          rejectionRemarks: doc.rejectionRemarks || '',
-          statusRemarks: doc.statusRemarks || '',
+          status: doc.status,
+          reviewNotes: doc.reviewNotes || '',
+          fileCount: doc.fileCount,
           files: doc.files || []
         }))
       };
@@ -1630,67 +889,54 @@ const VendorDocumentsPage: React.FC = () => {
     setUploadSuccess(null);
   };
 
+  // Generate document verification report for a specific submission
+  const handleGenerateSubmissionReport = async (submission: Submission) => {
+    if (!vendor) return;
 
+    setGeneratingReport(true);
+    setReportSuccess(null);
+    setReportError(null);
 
-  // Filter out compliance certificates from documents
-  const filteredDocumentsForCounts = filterOutComplianceCertificates(documents);
+    try {
+      const vendorData = {
+        name: vendor.name,
+        company: vendor.company,
+        email: vendor.email,
+        address: vendor.workLocation || ''
+      };
 
-  // Check if all documents are approved
-  const allDocumentsApproved = filteredDocumentsForCounts.length > 0 && filteredDocumentsForCounts.every(doc => doc.status === 'approved');
+      // Filter out compliance certificates and map to the expected format
+      console.log('Original submission documents:', submission.documents);
+      const filteredDocuments = filterOutComplianceCertificates(submission.documents);
+      console.log('Filtered documents (after removing compliance certificates):', filteredDocuments);
+      
+      const documentData = filteredDocuments.map(doc => ({
+        title: doc.title,
+        documentType: doc.documentType,
+        status: doc.status,
+        submissionDate: doc.submissionDate,
+        reviewNotes: doc.reviewNotes || '',
+        remarks: doc.reviewNotes || 'Document verified successfully',
+        fileCount: doc.fileCount
+      }));
 
-  // Get document counts by status
-  const documentCounts = {
-    total: filteredDocumentsForCounts.length,
-    approved: filteredDocumentsForCounts.filter(doc => doc.status === 'approved').length,
-    pending: filteredDocumentsForCounts.filter(doc => doc.status === 'pending').length,
-    underReview: filteredDocumentsForCounts.filter(doc => doc.status === 'under_review').length,
-    rejected: filteredDocumentsForCounts.filter(doc => doc.status === 'rejected').length,
-    resubmitted: filteredDocumentsForCounts.filter(doc => doc.status === 'resubmitted').length
-  };
+      console.log('Document data for verification report:', documentData);
 
-  // Debug: Log document statuses to understand the data
-  console.log('Document status breakdown:', {
-    totalDocuments: filteredDocumentsForCounts.length,
-    documentStatuses: filteredDocumentsForCounts.map(doc => ({ id: doc._id, title: doc.title, status: doc.status })),
-    counts: documentCounts
-  });
-
-
-
-  // Get years for filter dropdown
-  const getYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    return [
-      { value: 0, label: 'All Years' },
-      { value: currentYear - 1, label: `${currentYear - 1}` },
-      { value: currentYear, label: `${currentYear}` },
-      { value: currentYear + 1, label: `${currentYear + 1}` }
-    ];
-  };
-
-  // Get months for filter dropdown
-  const getMonthOptions = () => {
-    return [
-      { value: 'all', label: 'All Months' },
-      { value: 'Jan', label: 'January' },
-      { value: 'Feb', label: 'February' },
-      { value: 'Mar', label: 'March' },
-      { value: 'Apr', label: 'April' },
-      { value: 'May', label: 'May' },
-      { value: 'Jun', label: 'June' },
-      { value: 'Jul', label: 'July' },
-      { value: 'Aug', label: 'August' },
-      { value: 'Sep', label: 'September' },
-      { value: 'Oct', label: 'October' },
-      { value: 'Nov', label: 'November' },
-      { value: 'Dec', label: 'December' }
-    ];
+      await generateVerificationReport(vendorData, documentData, `Document Verification Report - ${vendor.name} - ${submission._id.slice(-8)}`);
+      setReportSuccess(true);
+    } catch (error: any) {
+      console.error('Error generating submission report:', error);
+      setReportError(error.message || 'Failed to generate submission report');
+      setReportSuccess(false);
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   return (
     <MainLayout>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Hidden image for logo reference (not displayed) */}
           <img 
             ref={logoRef}
@@ -1704,8 +950,8 @@ const VendorDocumentsPage: React.FC = () => {
           
           {/* Back button and header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-            <div className="flex items-center">
-              <Link to="/vendors-list" className="mr-4">
+            <div className="flex items-center gap-4">
+              <Link to="/consultant/vendors">
                 <Button variant="outline" size="md" className="flex items-center px-4 py-2">
                   <ChevronLeftIcon className="h-5 w-5 mr-2" />
                   Back to Vendors
@@ -1723,855 +969,888 @@ const VendorDocumentsPage: React.FC = () => {
               <div className="p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                   <div className="flex-1">
-                    <h2 className="text-xl font-semibold flex items-center mb-2">
-                      <BuildingOfficeIcon className="h-6 w-6 mr-3 text-blue-500" />
-                      {vendor.company}
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-lg">{vendor.email}</p>
-                    {vendor.workLocation && (
-                      <p className="text-gray-500 dark:text-gray-500 text-sm mt-1">
-                        Location: {vendor.workLocation}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
-                    <Badge variant="info" className="px-3 py-2 text-sm font-medium">
-                      Total: {documentCounts.total}
-                    </Badge>
-                    <Badge variant="success" className="px-3 py-2 text-sm font-medium">
-                      Approved: {documentCounts.approved}
-                    </Badge>
-                    <Badge variant="warning" className="px-3 py-2 text-sm font-medium">
-                      Pending: {documentCounts.pending}
-                    </Badge>
-                    <Badge variant="danger" className="px-3 py-2 text-sm font-medium">
-                      Rejected: {documentCounts.rejected}
-                    </Badge>
-                    <Badge variant="warning" className="px-3 py-2 text-sm font-medium">
-                      Resubmitted: {documentCounts.resubmitted}
-                    </Badge>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Company</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">{vendor.company}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">{vendor.email}</p>
+                      </div>
+                      {vendor.workLocation && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Work Location</p>
+                          <p className="text-lg font-semibold text-gray-900 dark:text-white">{vendor.workLocation}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </Card>
           )}
-        
-          {/* Error message */}
+
+          {/* Error state */}
           {error && (
-            <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-6 mb-8 rounded-lg shadow-md">
-              <div className="flex items-center">
-                <ExclamationTriangleIcon className="h-6 w-6 mr-3 flex-shrink-0" />
-                <p className="text-lg font-medium">{error}</p>
+            <Card className="mb-8 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400 mr-3" />
+                  <p className="text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Loading state */}
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <>
+              {/* Search and Filter Controls */}
+              <Card className="mb-8 shadow-lg">
+                <div className="p-6">
+                  <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                    <div className="flex-1 max-w-md">
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search documents..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3">
+                      <Select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="min-w-[140px]"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="resubmitted">Resubmitted</option>
+                      </Select>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowFilterModal(true)}
+                        className="flex items-center px-4 py-2"
+                      >
+                        <FunnelIcon className="h-5 w-5 mr-2" />
+                        Filters
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={refreshData}
+                        disabled={loading}
+                        className="flex items-center px-4 py-2"
+                      >
+                        <ArrowPathIcon className={`h-5 w-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                      
+                      <Button 
+                        variant="primary" 
+                        onClick={() => setShowUploadModal(true)}
+                        disabled={!vendor}
+                        className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-md"
+                      >
+                        <DocumentArrowUpIcon className="h-5 w-5 mr-2" />
+                        Upload Documents
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Documents List */}
+              {filteredSubmissions.length === 0 ? (
+                <Card className="shadow-lg">
+                  <div className="p-12 text-center">
+                    <DocumentTextIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No documents found</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      {searchQuery || statusFilter !== 'all' ? 
+                        'Try adjusting your search or filter criteria.' : 
+                        'This vendor has not submitted any documents yet.'
+                      }
+                    </p>
+                  </div>
+                </Card>
+              ) : (
+                <div className="space-y-8">
+                  {filteredSubmissions.map((submission) => (
+                    <Card key={submission._id} className="shadow-lg">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                            <CalendarIcon className="h-5 w-5 mr-2 text-gray-500" />
+                            Submitted on {format(parseISO(submission.submissionDate), 'PPP')}
+                          </h3>
+                          <Badge variant="secondary" className="text-sm">
+                            {submission.documents.length} document{submission.documents.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {submission.documents.map((document) => (
+                            <motion.div
+                              key={document._id}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Card className="h-full flex flex-col border-l-4 border-l-blue-400 hover:shadow-lg transition-all duration-200 hover:scale-105">
+                                <div className="flex-grow p-6">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">
+                                      {document.title}
+                                    </h4>
+                                    <div className="flex-shrink-0">
+                                      {document.status === 'pending' && (
+                                        <Badge variant="warning" className="px-3 py-1 text-sm font-medium">
+                                          ⏳ Pending
+                                        </Badge>
+                                      )}
+                                      {document.status === 'under_review' && (
+                                        <Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
+                                          🔍 Under Review
+                                        </Badge>
+                                      )}
+                                      {document.status === 'approved' && (
+                                        <Badge variant="success" className="px-3 py-1 text-sm font-medium">
+                                          ✅ Approved
+                                        </Badge>
+                                      )}
+                                      {document.status === 'rejected' && (
+                                        <Badge variant="danger" className="px-3 py-1 text-sm font-medium">
+                                          ❌ Rejected
+                                        </Badge>
+                                      )}
+                                      {document.status === 'resubmitted' && (
+                                        <Badge variant="warning" className="px-3 py-1 text-sm font-medium">
+                                          🔄 Resubmitted
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="space-y-3 mb-4">
+                                    <p className="text-base text-gray-600 dark:text-gray-400">
+                                      <span className="font-semibold text-gray-800 dark:text-gray-200">Type:</span> {document.documentType}
+                                    </p>
+                                    
+                                    <p className="text-base text-gray-600 dark:text-gray-400">
+                                      <span className="font-semibold text-gray-800 dark:text-gray-200">Files:</span> {document.fileCount} file{document.fileCount !== 1 ? 's' : ''}
+                                    </p>
+                                    
+                                    {document.reviewNotes && (
+                                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                          <span className="font-semibold text-gray-800 dark:text-gray-200">Remarks:</span>
+                                        </p>
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                                          {document.reviewNotes}
+                                        </p>
+                                      </div>
+                                    )}
+                                    
+                                    {document.status === 'resubmitted' && (
+                                      <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 p-3 rounded-lg">
+                                        <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                                          📄 This document has been resubmitted with new files. Please review the updated version.
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-800">
+                                  <div className="flex flex-wrap gap-3">
+                                    <Button
+                                      variant="outline"
+                                      size="md"
+                                      onClick={() => {
+                                        setSelectedDocument(document);
+                                        setShowDocumentModal(true);
+                                      }}
+                                      className="flex items-center px-4 py-2 text-base font-medium"
+                                    >
+                                      <EyeIcon className="h-5 w-5 mr-2" />
+                                      View Details
+                                    </Button>
+                                    
+                                    {document.status !== 'approved' && (
+                                      <Button
+                                        variant="success"
+                                        size="md"
+                                        onClick={() => handleApproveDocument(document)}
+                                        className="flex items-center px-4 py-2 text-base font-medium"
+                                      >
+                                        <CheckCircleIcon className="h-5 w-5 mr-2" />
+                                        Approve
+                                      </Button>
+                                    )}
+                                    
+                                    {document.status !== 'rejected' && (
+                                      <Button
+                                        variant="danger"
+                                        size="md"
+                                        onClick={() => handleRejectDocument(document)}
+                                        className="flex items-center px-4 py-2 text-base font-medium"
+                                      >
+                                        <XCircleIcon className="h-5 w-5 mr-2" />
+                                        Reject
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </div>
+                        
+                        {/* Report Buttons - Show only when all documents are approved */}
+                        {areAllDocumentsApproved(submission) && (
+                          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900 rounded-lg p-6">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                              <div className="flex items-center space-x-3">
+                                <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0" />
+                                <div>
+                                  <p className="text-lg font-semibold text-green-700 dark:text-green-300">
+                                    All Documents Approved! 🎉
+                                  </p>
+                                  <p className="text-sm text-green-600 dark:text-green-400">
+                                    {filterOutComplianceCertificates(submission.documents).length} document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''} ready for report generation
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col sm:flex-row gap-3">
+                                <Button
+                                  variant="primary"
+                                  size="md"
+                                  onClick={() => handleGenerateSubmissionReport(submission)}
+                                  disabled={generatingReport}
+                                  className="flex items-center px-6 py-3 text-base font-medium bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0 shadow-md"
+                                >
+                                  {generatingReport ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></div>
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <DocumentCheckIcon className="h-5 w-5 mr-3" />
+                                      Document Verification Report
+                                    </>
+                                  )}
+                                </Button>
+                                
+                                <Button
+                                  variant="secondary"
+                                  size="md"
+                                  onClick={() => {
+                                    // Store the current submission for later use
+                                    setSelectedDocument({
+                                      _id: submission._id,
+                                      title: 'Document Submission',
+                                      documentType: 'Submission',
+                                      submissionDate: submission.submissionDate,
+                                      status: 'pending',
+                                      fileCount: filterOutComplianceCertificates(submission.documents).length,
+                                      vendorId: vendorId || '',
+                                      submissionId: submission._id
+                                    });
+                                    
+                                    // Set default values for the form
+                                    setAuditFindings('All submitted documents have been reviewed and verified for compliance with regulatory requirements.');
+                                    setComplianceStatus('FULLY_COMPLIANT');
+                                    setComplianceRemarks('The vendor has demonstrated satisfactory compliance with all required documentation.');
+                                    
+                                    // Show the compliance form
+                                    setShowComplianceForm(true);
+                                  }}
+                                  disabled={generatingReport}
+                                  className="flex items-center px-6 py-3 text-base font-medium bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-md"
+                                >
+                                  {generatingReport ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></div>
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChartBarIcon className="h-5 w-5 mr-3" />
+                                      Compliance Verification Report
+                                    </>
+                                  )}
+                                </Button>
+
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Document Details Modal */}
+          <Modal
+            isOpen={showDocumentModal}
+            onClose={() => setShowDocumentModal(false)}
+            title="Document Details"
+            size="lg"
+          >
+            {selectedDocument && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Document Title
+                    </label>
+                    <p className="text-gray-900 dark:text-white">{selectedDocument.title}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Document Type
+                    </label>
+                    <p className="text-gray-900 dark:text-white">{selectedDocument.documentType}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Submission Date
+                    </label>
+                    <p className="text-gray-900 dark:text-white">
+                      {format(parseISO(selectedDocument.submissionDate), 'PPp')}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Status
+                    </label>
+                    <Badge 
+                      variant={
+                        selectedDocument.status === 'approved' ? 'success' :
+                        selectedDocument.status === 'rejected' ? 'danger' :
+                        selectedDocument.status === 'under_review' ? 'warning' :
+                        selectedDocument.status === 'resubmitted' ? 'info' :
+                        'default'
+                      }
+                    >
+                      {selectedDocument.status.charAt(0).toUpperCase() + selectedDocument.status.slice(1).replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </div>
+
+                {selectedDocument.reviewNotes && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Review Notes
+                    </label>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                        {selectedDocument.reviewNotes}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Files ({selectedDocument.fileCount})
+                  </label>
+                  <div className="space-y-2">
+                    {selectedDocument.files?.map((file, index) => (
+                      <div key={file._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="flex items-center">
+                          <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-3" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {file.fileName}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {file.fileType} • Uploaded {format(parseISO(file.uploadDate), 'PPp')}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadFile(file)}
+                          className="flex items-center"
+                        >
+                          <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDocumentModal(false)}
+                  >
+                    Close
+                  </Button>
+                  {selectedDocument.status !== 'approved' && (
+                    <Button
+                      variant="success"
+                      onClick={() => {
+                        setShowDocumentModal(false);
+                        handleApproveDocument(selectedDocument);
+                      }}
+                      className="flex items-center"
+                    >
+                      <CheckCircleIcon className="h-5 w-5 mr-2" />
+                      Approve
+                    </Button>
+                  )}
+                  {selectedDocument.status !== 'rejected' && (
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        setShowDocumentModal(false);
+                        handleRejectDocument(selectedDocument);
+                      }}
+                      className="flex items-center"
+                    >
+                      <XCircleIcon className="h-5 w-5 mr-2" />
+                      Reject
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Modal>
+
+          {/* Approval Modal */}
+          <Modal
+            isOpen={showApprovalModal}
+            onClose={() => setShowApprovalModal(false)}
+            title={`${approvalStatus === 'approved' ? 'Approve' : 'Reject'} Document`}
+            size="md"
+          >
+            {selectedDocument && (
+              <div className="space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    {selectedDocument.title}
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {selectedDocument.documentType} • Submitted {format(parseISO(selectedDocument.submissionDate), 'PPp')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {approvalStatus === 'approved' ? 'Approval' : 'Rejection'} Remarks *
+                  </label>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder={`Enter ${approvalStatus === 'approved' ? 'approval' : 'rejection'} remarks...`}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Please provide detailed remarks for your decision.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowApprovalModal(false)}
+                    disabled={processingApproval}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant={approvalStatus === 'approved' ? 'success' : 'danger'}
+                    onClick={handleSubmitApproval}
+                    disabled={processingApproval || !remarks.trim()}
+                  >
+                    {processingApproval ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {approvalStatus === 'approved' ? (
+                          <CheckCircleIcon className="h-5 w-5 mr-2" />
+                        ) : (
+                          <XCircleIcon className="h-5 w-5 mr-2" />
+                        )}
+                        {approvalStatus === 'approved' ? 'Approve' : 'Reject'} Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Modal>
+
+          {/* Filter Modal */}
+          <Modal
+            isOpen={showFilterModal}
+            onClose={() => setShowFilterModal(false)}
+            title="Filter Documents"
+            size="md"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Year
+                </label>
+                <Select
+                  value={filterOptions.year.toString()}
+                  onChange={(e) => setFilterOptions(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                >
+                  {getYearOptions().map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Month
+                </label>
+                <Select
+                  value={filterOptions.month}
+                  onChange={(e) => setFilterOptions(prev => ({ ...prev, month: e.target.value }))}
+                >
+                  {getMonthOptions().map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Status
+                </label>
+                <Select
+                  value={filterOptions.status}
+                  onChange={(e) => setFilterOptions(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="under_review">Under Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="resubmitted">Resubmitted</option>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFilterOptions({
+                      year: new Date().getFullYear(),
+                      month: 'all',
+                      status: 'all'
+                    });
+                  }}
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => setShowFilterModal(false)}
+                >
+                  Apply Filters
+                </Button>
               </div>
             </div>
-          )}
-        
-          {/* Search and filter bar */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-            <div className="flex flex-col space-y-4">
-              {/* Search Input */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          </Modal>
+
+          {/* Report Generation Modal */}
+          <Modal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            title="Generate Verification Report"
+            size="md"
+          >
+            <div className="space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start">
+                  <DocumentCheckIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-3 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                      Document Verification Report
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Generate a comprehensive PDF report containing all document verification details for {vendor?.name}.
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              {reportSuccess !== null && (
+                <div className={`border rounded-lg p-4 ${
+                  reportSuccess 
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                }`}>
+                  <div className="flex items-start">
+                    {reportSuccess ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-600 dark:text-green-400 mr-3 mt-0.5" />
+                    ) : (
+                      <XCircleIcon className="h-6 w-6 text-red-600 dark:text-red-400 mr-3 mt-0.5" />
+                    )}
+                    <div>
+                      <h4 className={`text-sm font-medium mb-1 ${
+                        reportSuccess 
+                          ? 'text-green-900 dark:text-green-100' 
+                          : 'text-red-900 dark:text-red-100'
+                      }`}>
+                        {reportSuccess ? 'Report Generated Successfully' : 'Report Generation Failed'}
+                      </h4>
+                      <p className={`text-sm ${
+                        reportSuccess 
+                          ? 'text-green-700 dark:text-green-300' 
+                          : 'text-red-700 dark:text-red-300'
+                      }`}>
+                        {reportSuccess 
+                          ? 'The verification report has been downloaded to your device.' 
+                          : reportError || 'An error occurred while generating the report.'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowReportModal(false);
+                    setReportSuccess(null);
+                    setReportError(null);
+                  }}
+                  disabled={generatingReport}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleGenerateReport}
+                  disabled={generatingReport || !vendor}
+                  className="flex items-center"
+                >
+                  {generatingReport ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+                      Generate Report
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
+          {/* Upload Documents Modal */}
+          <Modal
+            isOpen={showUploadModal}
+            onClose={handleCloseUploadModal}
+            title="Upload Documents"
+            size="lg"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Document Title *
+                </label>
                 <input
                   type="text"
-                  className="block w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                  placeholder="Search documents by title, type, or status..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                  placeholder="Enter document title"
                 />
               </div>
               
-              {/* Filter Controls */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <select
-                    className="block w-full py-3 px-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="under_review">Under Review</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="resubmitted">Resubmitted</option>
-                  </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Document Type *
+                </label>
+                <select
+                  value={uploadDocumentType}
+                  onChange={(e) => setUploadDocumentType(e.target.value)}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
+                >
+                  <option value="COMPLIANCE_CERTIFICATE">Compliance Certificate</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Files *
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setUploadFiles(e.target.files)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
+                </p>
+              </div>
+              
+              {uploadError && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded">
+                  <div className="flex items-center">
+                    <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+                    <p>{uploadError}</p>
+                  </div>
                 </div>
-                
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowFilterModal(true)}
-                    className="flex items-center px-4 py-3 text-base"
-                  >
-                    <AdjustmentsHorizontalIcon className="h-5 w-5 mr-2" />
-                    Advanced Filters
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={refreshData}
-                    disabled={loading}
-                    className="flex items-center px-4 py-3 text-base"
-                  >
-                    <ArrowPathIcon className="h-5 w-5 mr-2" />
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                  
-                  <Button 
-                    variant="primary" 
-                    onClick={() => setShowUploadModal(true)}
-                    disabled={!vendor}
-                    className="flex items-center px-4 py-3 text-base bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-md"
-                  >
-                    <DocumentArrowUpIcon className="h-5 w-5 mr-2" />
-                    Upload Documents
-                  </Button>
-                  
-
+              )}
+              
+              {uploadSuccess && (
+                <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded">
+                  <div className="flex items-center">
+                    <CheckCircleIcon className="h-5 w-5 mr-2" />
+                    <p>{uploadSuccess}</p>
+                  </div>
                 </div>
+              )}
+              
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseUploadModal}
+                  disabled={uploading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleUploadDocuments}
+                  disabled={uploading || !uploadFiles || !uploadDocumentType || !uploadTitle.trim()}
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <DocumentArrowUpIcon className="h-5 w-5 mr-1" />
+                      Upload Documents
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-          </div>
-        
-        {/* Submissions list */}
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        ) : filteredSubmissions.length > 0 ? (
-          <div className="space-y-8">
-            {filteredSubmissions.map((submission) => (
-              <motion.div
-                key={submission._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="overflow-hidden">
-                  {/* Submission Header */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <CalendarIcon className="h-6 w-6 text-blue-500" />
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Document Submission
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Submitted on {safeFormatDate(submission.submissionDate, 'MMMM dd, yyyy \'at\' h:mm a')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="info" className="px-3 py-1">
-                          {filterOutComplianceCertificates(submission.documents).length} Document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''}
-                        </Badge>
-                        {areAllDocumentsApproved(submission) && (
-                          <Badge variant="success" className="px-3 py-1 flex items-center">
-                            <CheckCircleIcon className="h-4 w-4 mr-1" />
-                            All Approved
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+          </Modal>
 
-                  {/* Documents Grid */}
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {submission.documents.filter((document) => document.documentType !== 'COMPLIANCE_CERTIFICATE').map((document) => (
-                        <motion.div
-                          key={document._id}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <Card className="h-full flex flex-col border-l-4 border-l-blue-400 hover:shadow-lg transition-all duration-200 hover:scale-105">
-                            <div className="flex-grow p-6">
-                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
-                                <h4 className="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">
-                                  {document.title}
-                                </h4>
-                                <div className="flex-shrink-0">
-                                  {document.status === 'pending' && (
-                                    <Badge variant="warning" className="px-3 py-1 text-sm font-medium">
-                                      ⏳ Pending
-                                    </Badge>
-                                  )}
-                                  {document.status === 'under_review' && (
-                                    <Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
-                                      🔍 Under Review
-                                    </Badge>
-                                  )}
-                                  {document.status === 'approved' && (
-                                    <Badge variant="success" className="px-3 py-1 text-sm font-medium">
-                                      ✅ Approved
-                                    </Badge>
-                                  )}
-                                  {document.status === 'rejected' && (
-                                    <Badge variant="danger" className="px-3 py-1 text-sm font-medium">
-                                      ❌ Rejected
-                                    </Badge>
-                                  )}
-                                  {document.status === 'resubmitted' && (
-                                    <Badge variant="warning" className="px-3 py-1 text-sm font-medium">
-                                      🔄 Resubmitted
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <div className="space-y-3 mb-4">
-                                <p className="text-base text-gray-600 dark:text-gray-400">
-                                  <span className="font-semibold text-gray-800 dark:text-gray-200">Type:</span> {document.documentType}
-                                </p>
-                                
-                                <p className="text-base text-gray-600 dark:text-gray-400">
-                                  <span className="font-semibold text-gray-800 dark:text-gray-200">Files:</span> {document.fileCount} file{document.fileCount !== 1 ? 's' : ''}
-                                </p>
-                                
-                                {document.reviewNotes && (
-                                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                                      <span className="font-semibold text-gray-800 dark:text-gray-200">Remarks:</span>
-                                    </p>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                                      {document.reviewNotes}
-                                    </p>
-                                  </div>
-                                )}
-                                
-                                {document.status === 'resubmitted' && (
-                                  <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 p-3 rounded-lg">
-                                    <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                                      📄 This document has been resubmitted with new files. Please review the updated version.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-800">
-                              <div className="flex flex-wrap gap-3">
-                                <Button
-                                  variant="outline"
-                                  size="md"
-                                  onClick={() => handleViewDocument(document)}
-                                  className="flex items-center px-4 py-2 text-base font-medium"
-                                >
-                                  <EyeIcon className="h-5 w-5 mr-2" />
-                                  View Details
-                                </Button>
-                                
-                                {document.status !== 'approved' && (
-                                  <Button
-                                    variant="success"
-                                    size="md"
-                                    onClick={() => handleApproveDocument(document)}
-                                    className="flex items-center px-4 py-2 text-base font-medium"
-                                  >
-                                    <CheckCircleIcon className="h-5 w-5 mr-2" />
-                                    Approve
-                                  </Button>
-                                )}
-                                
-                                {document.status !== 'rejected' && (
-                                  <Button
-                                    variant="danger"
-                                    size="md"
-                                    onClick={() => handleRejectDocument(document)}
-                                    className="flex items-center px-4 py-2 text-base font-medium"
-                                  >
-                                    <XCircleIcon className="h-5 w-5 mr-2" />
-                                    Reject
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </Card>
-                        </motion.div>
-                      ))}
-                    </div>
-                    
-                    {/* Report Buttons - Show only when all documents are approved */}
-                    {areAllDocumentsApproved(submission) && (
-                      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900 rounded-lg p-6">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                          <div className="flex items-center space-x-3">
-                            <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0" />
-                            <div>
-                              <p className="text-lg font-semibold text-green-700 dark:text-green-300">
-                                All Documents Approved! 🎉
-                              </p>
-                              <p className="text-sm text-green-600 dark:text-green-400">
-                                {filterOutComplianceCertificates(submission.documents).length} document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''} ready for report generation
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Button
-                              variant="primary"
-                              size="md"
-                              onClick={() => handleGenerateSubmissionReport(submission)}
-                              disabled={generatingReport}
-                              className="flex items-center px-6 py-3 text-base font-medium bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0 shadow-md"
-                            >
-                              {generatingReport ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></div>
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <DocumentCheckIcon className="h-5 w-5 mr-3" />
-                                  Document Verification Report
-                                </>
-                              )}
-                            </Button>
-                            
-                            <Button
-                              variant="secondary"
-                              size="md"
-                              onClick={() => {
-                                // Store the current submission for later use
-                                setSelectedDocument({
-                                  _id: submission._id,
-                                  title: 'Document Submission',
-                                  documentType: 'Submission',
-                                  submissionDate: submission.submissionDate,
-                                  status: 'pending',
-                                  fileCount: filterOutComplianceCertificates(submission.documents).length,
-                                  vendorId: vendorId || '',
-                                  submissionId: submission._id
-                                });
-                                
-                                // Set default values for the form
-                                setAuditFindings('All submitted documents have been reviewed and verified for compliance with regulatory requirements.');
-                                setComplianceStatus('FULLY_COMPLIANT');
-                                setComplianceRemarks('The vendor has demonstrated satisfactory compliance with all required documentation.');
-                                
-                                // Show the compliance form
-                                setShowComplianceForm(true);
-                              }}
-                              disabled={generatingReport}
-                              className="flex items-center px-6 py-3 text-base font-medium bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-md"
-                            >
-                              {generatingReport ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-3"></div>
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <ChartBarIcon className="h-5 w-5 mr-3" />
-                                  Compliance Verification Report
-                                </>
-                              )}
-                            </Button>
+          {/* Compliance Form Modal */}
+          <Modal
+            isOpen={showComplianceForm}
+            onClose={resetComplianceForm}
+            title="Compliance Verification Report"
+            size="lg"
+          >
+            <div className="p-6">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Audit Findings & Review
+                  </label>
+                  <textarea
+                    value={auditFindings}
+                    onChange={(e) => setAuditFindings(e.target.value)}
+                    placeholder="Enter detailed audit findings and review comments..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows={4}
+                    required
+                  />
+                </div>
 
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
-            <DocumentTextIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No documents found</h3>
-            <p className="text-base text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-              {searchQuery || statusFilter !== 'all' || filterOptions.month !== 'all' || filterOptions.year !== 0
-                ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                : 'This vendor has not submitted any documents yet.'}
-            </p>
-            {(searchQuery || statusFilter !== 'all' || filterOptions.month !== 'all' || filterOptions.year !== 0) && (
-              <Button
-                variant="outline"
-                size="md"
-                className="px-6 py-3 text-base font-medium"
-                onClick={resetFilters}
-              >
-                Clear All Filters
-              </Button>
-            )}
-          </div>
-        )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Compliance Status
+                  </label>
+                  <Select
+                    value={complianceStatus}
+                    onChange={(e) => setComplianceStatus(e.target.value)}
+                    className="w-full"
+                    required
+                  >
+                    <option value="">Select compliance status</option>
+                    <option value="FULLY_COMPLIANT">Fully Compliant</option>
+                    <option value="PARTIALLY_COMPLIANT">Partially Compliant</option>
+                    <option value="NON_COMPLIANT">Non-Compliant</option>
+                    <option value="UNDER_REVIEW">Under Review</option>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Compliance Remarks
+                  </label>
+                  <textarea
+                    value={complianceRemarks}
+                    onChange={(e) => setComplianceRemarks(e.target.value)}
+                    placeholder="Enter specific compliance remarks and recommendations..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows={4}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
+                <Button
+                  variant="outline"
+                  onClick={resetComplianceForm}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleComplianceFormSubmit}
+                  disabled={!auditFindings.trim() || !complianceStatus.trim() || !complianceRemarks.trim()}
+                >
+                  <DocumentCheckIcon className="h-5 w-5 mr-1" />
+                  Generate Report
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
         </div>
       </div>
-      
-      {/* Document View Modal */}
-      <Modal
-        isOpen={showDocumentModal}
-        onClose={() => setShowDocumentModal(false)}
-        title={selectedDocument?.title || 'View Document'}
-      >
-        <div className="p-4">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold mb-2">{selectedDocument?.title}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              <span className="font-medium">Type:</span> {selectedDocument?.documentType}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              <span className="font-medium">Status:</span> {selectedDocument?.status}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              <span className="font-medium">Submitted:</span> {selectedDocument?.submissionDate ? safeFormatDate(selectedDocument.submissionDate, 'MMM dd, yyyy') : 'Unknown'}
-            </p>
-            {selectedDocument?.reviewNotes && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                <span className="font-medium">Remarks:</span> {selectedDocument.reviewNotes}
-              </p>
-            )}
-          </div>
-          
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h4 className="font-medium mb-2">Files:</h4>
-            {selectedDocument?.files && selectedDocument.files.length > 0 ? (
-              <ul className="space-y-2">
-                {selectedDocument.files.map((file) => (
-                  <li key={file._id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                    <span className="truncate flex-1">{file.fileName}</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex items-center ml-2"
-                      onClick={() => {
-                        // Use the API service to view the file
-                        apiService.documents.viewFile(file.filePath)
-                          .then(response => {
-                            // Create a blob URL from the response
-                            const blob = new Blob([response.data], { type: response.headers['content-type'] });
-                            const url = window.URL.createObjectURL(blob);
-                            
-                            // Open the file in a new tab
-                            window.open(url, '_blank');
-                          })
-                          .catch(error => {
-                            console.error('Error viewing file:', error);
-                            alert('Error viewing file. Please try again.');
-                          });
-                      }}
-                    >
-                      <EyeIcon className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center ml-2"
-                      onClick={() => {
-                        // Use the API service to download the file
-                        apiService.documents.downloadFile(file.filePath, file.fileName)
-                          .then(response => {
-                            // Create a blob URL from the response
-                            const blob = new Blob([response.data], { type: response.headers['content-type'] });
-                            const url = window.URL.createObjectURL(blob);
-                            
-                            // Create a temporary link element to trigger the download
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = file.fileName;
-                            document.body.appendChild(link);
-                            link.click();
-                            
-                            // Clean up
-                            document.body.removeChild(link);
-                            window.URL.revokeObjectURL(url);
-                          })
-                          .catch(error => {
-                            console.error('Error downloading file:', error);
-                            alert('Error downloading file. Please try again.');
-                          });
-                      }}
-                    >
-                      <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                      Download
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400">No files available</p>
-            )}
-          </div>
-          
-          <div className="mt-6 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setShowDocumentModal(false)}
-            >
-              Close
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
-      {/* Approval/Rejection Modal */}
-      <Modal
-        isOpen={showApprovalModal}
-        onClose={() => setShowApprovalModal(false)}
-        title={`${approvalStatus === 'approved' ? 'Approve' : 'Reject'} Document`}
-      >
-        <div className="p-4">
-          <p className="mb-4">
-            Are you sure you want to {approvalStatus === 'approved' ? 'approve' : 'reject'} the document "{selectedDocument?.title}"?
-          </p>
-          
-          <div className="mb-4">
-            <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Remarks <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              id="remarks"
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              placeholder="Add your remarks here (required)..."
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              required
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              You must provide remarks before approving or rejecting a document.
-            </p>
-          </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowApprovalModal(false)}
-              disabled={processingApproval}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={approvalStatus === 'approved' ? 'success' : 'danger'}
-              onClick={handleSubmitApproval}
-              disabled={processingApproval || !remarks.trim()}
-            >
-              {processingApproval ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
-                  Processing...
-                </>
-              ) : (
-                approvalStatus === 'approved' ? 'Confirm Approval' : 'Confirm Rejection'
-              )}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
-      {/* Filter Modal */}
-      <Modal
-        isOpen={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        title="Filter Documents"
-      >
-        <div className="p-4">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Year
-            </label>
-            <Select
-              value={filterOptions.year}
-              onChange={(e) => setFilterOptions({ ...filterOptions, year: Number(e.target.value) })}
-            >
-              {getYearOptions().map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Month
-            </label>
-            <Select
-              value={filterOptions.month}
-              onChange={(e) => setFilterOptions({ ...filterOptions, month: String(e.target.value) })}
-            >
-              {getMonthOptions().map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(String(e.target.value))}
-            >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="under_review">Under Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="resubmitted">Resubmitted</option>
-            </Select>
-          </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={resetFilters}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="primary"
-              onClick={applyFilters}
-            >
-              Apply Filters
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
-      {/* Report Generation Modal */}
-      <Modal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        title="Generate Verification Report"
-      >
-        <div className="p-4">
-          <p className="mb-4">
-            Generate a verification report for all approved documents from {vendor?.name || 'this vendor'}.
-          </p>
-          
-          {reportSuccess === true && (
-            <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded">
-              <div className="flex items-center">
-                <CheckCircleIcon className="h-5 w-5 mr-2" />
-                <p>Report generated successfully!</p>
-              </div>
-            </div>
-          )}
-          
-          {reportError && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
-              <div className="flex items-center">
-                <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
-                <p>{reportError}</p>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowReportModal(false)}
-              disabled={generatingReport}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={generateDocumentReport}
-              disabled={generatingReport}
-            >
-              {generatingReport ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <DocumentArrowDownIcon className="h-5 w-5 mr-1" />
-                  Generate Report
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
-      {/* Upload Documents Modal */}
-      <Modal
-        isOpen={showUploadModal}
-        onClose={handleCloseUploadModal}
-        title="Upload Documents"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Document Title *
-            </label>
-            <input
-              type="text"
-              value={uploadTitle}
-              onChange={(e) => setUploadTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              placeholder="Enter document title"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Document Type *
-            </label>
-            <select
-              value={uploadDocumentType}
-              onChange={(e) => setUploadDocumentType(e.target.value)}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-            >
-              <option value="COMPLIANCE_CERTIFICATE">Compliance Certificate</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Files *
-            </label>
-            <input
-              type="file"
-              multiple
-              onChange={(e) => setUploadFiles(e.target.files)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
-            </p>
-          </div>
-          
-          {uploadError && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded">
-              <div className="flex items-center">
-                <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
-                <p>{uploadError}</p>
-              </div>
-            </div>
-          )}
-          
-          {uploadSuccess && (
-            <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded">
-              <div className="flex items-center">
-                <CheckCircleIcon className="h-5 w-5 mr-2" />
-                <p>{uploadSuccess}</p>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={handleCloseUploadModal}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleUploadDocuments}
-              disabled={uploading || !uploadFiles || !uploadDocumentType || !uploadTitle.trim()}
-            >
-              {uploading ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <DocumentArrowUpIcon className="h-5 w-5 mr-1" />
-                  Upload Documents
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Compliance Form Modal */}
-      <Modal
-        isOpen={showComplianceForm}
-        onClose={resetComplianceForm}
-        title="Compliance Verification Report"
-        size="lg"
-      >
-        <div className="p-6">
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Audit Findings & Review
-              </label>
-              <textarea
-                value={auditFindings}
-                onChange={(e) => setAuditFindings(e.target.value)}
-                placeholder="Enter detailed audit findings and review comments..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                rows={4}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Compliance Status
-              </label>
-              <Select
-                value={complianceStatus}
-                onChange={(e) => setComplianceStatus(e.target.value)}
-                className="w-full"
-                required
-              >
-                <option value="">Select compliance status</option>
-                <option value="FULLY_COMPLIANT">Fully Compliant</option>
-                <option value="PARTIALLY_COMPLIANT">Partially Compliant</option>
-                <option value="NON_COMPLIANT">Non-Compliant</option>
-                <option value="UNDER_REVIEW">Under Review</option>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Compliance Remarks
-              </label>
-              <textarea
-                value={complianceRemarks}
-                onChange={(e) => setComplianceRemarks(e.target.value)}
-                placeholder="Enter specific compliance remarks and recommendations..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                rows={4}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
-            <Button
-              variant="outline"
-              onClick={resetComplianceForm}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleComplianceFormSubmit}
-              disabled={!auditFindings.trim() || !complianceStatus.trim() || !complianceRemarks.trim()}
-            >
-              <DocumentCheckIcon className="h-5 w-5 mr-1" />
-              Generate Report
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
     </MainLayout>
   );
 };
