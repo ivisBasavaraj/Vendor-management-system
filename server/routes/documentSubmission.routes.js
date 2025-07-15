@@ -9,6 +9,9 @@ const { protect, authorize } = require('../middlewares/auth.middleware');
 // Create new document submission
 router.post('/create', protect, documentSubmissionController.createSubmission);
 
+// Upload documents on behalf of vendor (for consultants)
+router.post('/consultant-upload', protect, authorize('consultant', 'admin'), documentSubmissionController.consultantUploadDocument);
+
 // Upload document to submission
 router.post('/:submissionId/upload', protect, documentSubmissionController.uploadDocument);
 

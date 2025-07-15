@@ -382,7 +382,7 @@ const apiService = {
         console.log(pair[0], pair[1] instanceof File ? `File: ${pair[1].name}` : pair[1]);
       });
       
-      return api.post(`${API_PREFIX}/document-submissions/create`, formData, {
+      return api.post(`${API_PREFIX}/document-submissions/consultant-upload`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data'
         }

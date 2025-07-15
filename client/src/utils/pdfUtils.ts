@@ -144,7 +144,7 @@ const generateComplianceVerificationReport = async (
     const footerY = pageHeight - 15;
     
     // Helper function to add header to each page
-    const addPageHeader = (pageNumber: number, totalPages: number) => {
+    const addPageHeader = () => {
       // Add Varuni logo (Top left corner, bigger size)
       if (cachedLogos.varuni) {
         const logoWidth = 60;
@@ -161,20 +161,21 @@ const generateComplianceVerificationReport = async (
       
       // Reset text color
       pdf.setTextColor(0, 0, 0);
-      
-      // Add page number
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, 8, { align: 'right' });
     };
     
     // Helper function to add footer to each page
-    const addPageFooter = (reportDate: string, reportTime: string) => {
+    const addPageFooter = (reportDate: string, reportTime: string, pageNumber: number, totalPages: number) => {
       pdf.setFontSize(7);
       pdf.setFont('helvetica', 'italic');
       pdf.setTextColor(100, 100, 100);
       pdf.text('This is a computer-generated compliance verification report.', pageWidth / 2, footerY, { align: 'center' });
       pdf.text(`Generated on ${reportDate} at ${reportTime}`, pageWidth / 2, footerY + 3, { align: 'center' });
+      
+      // Add page number to footer (right side)
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, footerY + 3, { align: 'right' });
+      
       pdf.setTextColor(0, 0, 0);
     };
     
@@ -209,18 +210,37 @@ const generateComplianceVerificationReport = async (
     // Handle document data from submission
     let documentsToShow = defaultDocuments;
     if (submissionData.documents && submissionData.documents.length > 0) {
-      documentsToShow = submissionData.documents.map((doc: any, index: number) => ({
-        slNo: index + 1,
-        particulars: doc.documentType || doc.documentName || doc.title || 'Unknown Document',
-        status: doc.status ? doc.status.toUpperCase() : 'PENDING',
-        remarks: doc.consultantRemarks || doc.remarks || 'Under review'
+      documentsToShow = submissionData.documents.map((doc: any, index: number) => {
+        // Use individual document remarks - check multiple possible fields
+        const documentRemarks = doc.consultantRemarks || 
+                               doc.reviewNotes || 
+                               doc.remarks || 
+                               doc.consultantNotes || 
+                               doc.approvalRemarks ||
+                               doc.rejectionRemarks ||
+                               doc.statusRemarks ||
+                               'No specific remarks provided';
+        
+        return {
+          slNo: index + 1,
+          particulars: doc.documentType || doc.documentName || doc.title || 'Unknown Document',
+          status: doc.status ? doc.status.toUpperCase() : 'PENDING',
+          remarks: documentRemarks
+        };
+      });
+    } else {
+      // For default documents, use the global compliance remarks as fallback
+      const globalComplianceRemarks = complianceMetrics?.remarks || 'All documents are compliant with regulatory requirements.';
+      documentsToShow = defaultDocuments.map(doc => ({
+        ...doc,
+        remarks: globalComplianceRemarks
       }));
     }
     
     const totalPages = 2;
     
     // ==================== PAGE 1: COMPLIANCE VERIFICATION REPORT ====================
-    addPageHeader(1, totalPages);
+    addPageHeader();
     
     let currentY = 35;
     
@@ -301,11 +321,11 @@ const generateComplianceVerificationReport = async (
     // Skip the compliance summary section as requested
     currentY += 5;
     
-    addPageFooter(reportDate, reportTime);
+    addPageFooter(reportDate, reportTime, 1, totalPages);
     
     // ==================== PAGE 2: DOCUMENTS VERIFICATION REPORT ====================
     pdf.addPage();
-    addPageHeader(2, totalPages);
+    addPageHeader();
     
     currentY = 35;
     
@@ -324,12 +344,18 @@ const generateComplianceVerificationReport = async (
     pdf.text(`Documents verified for the period: ${month} ${year}`, pageWidth / 2, currentY, { align: 'center' });
     currentY += 15;
     
-    // Create enhanced documents table
+    // Create enhanced documents table with proper text formatting
     const documentTableData = documentsToShow.map(doc => [
       doc.slNo.toString().padStart(2, '0'),
-      doc.particulars,
+      // Ensure document particulars text wraps properly
+      doc.particulars.length > 80 ? 
+        doc.particulars.substring(0, 77) + '...' : 
+        doc.particulars,
       doc.status || 'PENDING',
-      doc.remarks || 'No specific remarks'
+      // Ensure remarks text is properly formatted and not too long
+      (doc.remarks || 'No specific remarks').length > 120 ? 
+        (doc.remarks || 'No specific remarks').substring(0, 117) + '...' : 
+        (doc.remarks || 'No specific remarks')
     ]);
     
     autoTable(pdf, {
@@ -337,27 +363,31 @@ const generateComplianceVerificationReport = async (
       body: documentTableData,
       startY: currentY,
       theme: 'striped',
+      margin: { left: margin, right: margin },
+      tableWidth: 'auto',
       headStyles: {
         fillColor: [70, 130, 180],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 12,
-        halign: 'center'
+        fontSize: 11,
+        halign: 'center',
+        valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 18, halign: 'center', fontStyle: 'bold', fontSize: 10 },
-        1: { cellWidth: 100, fontStyle: 'bold', fontSize: 10 },
-        2: { cellWidth: 35, halign: 'center', fontStyle: 'bold', fontSize: 10 },
-        3: { cellWidth: 60, fontStyle: 'bold', fontSize: 10 }
+        0: { cellWidth: contentWidth * 0.09, halign: 'center', fontStyle: 'bold', fontSize: 9 }, // ~9% for S.No
+        1: { cellWidth: contentWidth * 0.44, fontStyle: 'bold', fontSize: 9, overflow: 'linebreak' }, // ~44% for Document Particulars
+        2: { cellWidth: contentWidth * 0.18, halign: 'center', fontStyle: 'bold', fontSize: 9 }, // ~18% for Status
+        3: { cellWidth: contentWidth * 0.29, fontStyle: 'bold', fontSize: 9, overflow: 'linebreak' } // ~29% for Compliance Remarks
       },
       styles: {
-        cellPadding: 6,
-        fontSize: 10,
+        cellPadding: 4,
+        fontSize: 9,
         fontStyle: 'bold',
         overflow: 'linebreak',
         lineColor: [150, 150, 150],
         lineWidth: 0.3,
-        valign: 'top'
+        valign: 'top',
+        minCellHeight: 10
       },
       alternateRowStyles: {
         fillColor: [248, 249, 250]
@@ -367,7 +397,7 @@ const generateComplianceVerificationReport = async (
       }
     });
     
-    addPageFooter(reportDate, reportTime);
+    addPageFooter(reportDate, reportTime, 2, totalPages);
     
     return pdf;
   } catch (error) {

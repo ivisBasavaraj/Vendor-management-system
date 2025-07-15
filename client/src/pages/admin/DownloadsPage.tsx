@@ -33,9 +33,7 @@ import { FontAwesomeIcon } from '../../utils/icons';
 import { 
   faSearch, 
   faFilter,
-  faEye,
   faDownload,
-  faPrint,
   faCalendarAlt,
   faFileAlt,
   faUsers,
@@ -48,7 +46,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import MainLayout from '../../components/layout/MainLayout';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import apiService from '../../utils/api';
 
 // Types
 interface ComplianceReportAttachment {
@@ -89,6 +87,7 @@ interface DownloadItem {
   year?: number;
   reportId?: string;
   attachmentId?: string;
+  originalDocumentType?: string;
 }
 
 // Styled Components
@@ -208,7 +207,6 @@ const generateAvailableYears = (dataYears: string[] = []): string[] => {
 };
 
 const DownloadsPage: React.FC = () => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [page, setPage] = useState(0);
@@ -229,8 +227,8 @@ const DownloadsPage: React.FC = () => {
       try {
         setLoading(true);
         
-        // Fetch both regular documents and compliance report attachments
-        const [documentsResponse, complianceReportsResponse] = await Promise.allSettled([
+        // Fetch regular documents, compliance report attachments, and consultant-uploaded documents
+        const [documentsResponse, complianceReportsResponse, consultantSubmissionsResponse] = await Promise.allSettled([
           // Regular documents
           axios.get('/api/documents', { 
             params: {
@@ -246,19 +244,46 @@ const DownloadsPage: React.FC = () => {
               month: monthFilter !== 'all' ? monthFilter : undefined,
               limit: 1000 // Get a large number to include all reports
             }
+          }),
+          // Document submissions uploaded by consultants
+          axios.get('/api/document-submissions/admin/all', {
+            params: {
+              year: yearFilter !== 'all' ? yearFilter : undefined,
+              month: monthFilter !== 'all' ? monthFilter : undefined,
+              uploadedByConsultant: true // Only get consultant-uploaded documents
+            }
           })
         ]);
 
         let combinedDownloads: DownloadItem[] = [];
 
+        // Debug API responses
+        console.log('API Responses Status:', {
+          documents: documentsResponse.status,
+          complianceReports: complianceReportsResponse.status,
+          consultantSubmissions: consultantSubmissionsResponse.status
+        });
+
+        if (documentsResponse.status === 'rejected') {
+          console.error('Documents API failed:', documentsResponse.reason);
+        }
+        if (complianceReportsResponse.status === 'rejected') {
+          console.error('Compliance Reports API failed:', complianceReportsResponse.reason);
+        }
+        if (consultantSubmissionsResponse.status === 'rejected') {
+          console.error('Consultant Submissions API failed:', consultantSubmissionsResponse.reason);
+        }
+
         // Process regular documents
         if (documentsResponse.status === 'fulfilled' && documentsResponse.value.data.data) {
           combinedDownloads = [...documentsResponse.value.data.data];
+          console.log('Regular documents processed:', combinedDownloads.length);
         }
 
         // Process compliance report attachments
         if (complianceReportsResponse.status === 'fulfilled' && complianceReportsResponse.value.data.data) {
           const complianceReports: ComplianceReport[] = complianceReportsResponse.value.data.data;
+          console.log('Compliance Reports fetched:', complianceReports.length);
           console.log('Compliance Reports:', complianceReports);
           
           complianceReports.forEach((report: ComplianceReport) => {
@@ -288,6 +313,43 @@ const DownloadsPage: React.FC = () => {
           });
         }
 
+        // Process consultant-uploaded document submissions
+        if (consultantSubmissionsResponse.status === 'fulfilled' && consultantSubmissionsResponse.value.data.data) {
+          const consultantSubmissions = consultantSubmissionsResponse.value.data.data;
+          console.log('Consultant Submissions fetched:', consultantSubmissions.length);
+          console.log('Consultant Submissions:', consultantSubmissions);
+          
+          consultantSubmissions.forEach((submission: any) => {
+            console.log('Processing submission:', submission._id, 'Documents:', submission.documents);
+            if (submission.documents && submission.documents.length > 0) {
+              submission.documents.forEach((document: any) => {
+                console.log('Processing document:', document);
+                // Only include approved documents or all documents if needed
+                if (document.status === 'approved' || document.status === 'uploaded' || document.status === 'under_review') {
+                  combinedDownloads.push({
+                    id: `consultant-${submission._id}-${document._id || Date.now()}`,
+                    vendorName: submission.vendor?.name || submission.vendor?.company || 'Unknown Vendor',
+                    consultantName: submission.consultant?.name || submission.uploadedBy?.name || 'Unknown Consultant',
+                    documentType: document.documentName || document.documentType || 'Document',
+                    fileName: document.fileName,
+                    submittedDate: document.uploadDate || submission.submissionDate || submission.createdAt,
+                    approvedDate: document.reviewDate || document.uploadDate || submission.submissionDate,
+                    fileSize: formatFileSize(document.fileSize || 0),
+                    fileType: getFileTypeFromPath(document.fileName || ''),
+                    filePath: document.filePath,
+                    reportType: 'Consultant Upload',
+                    month: submission.uploadPeriod?.month || 'Unknown',
+                    year: submission.uploadPeriod?.year || new Date().getFullYear(),
+                    reportId: submission._id,
+                    attachmentId: document._id,
+                    originalDocumentType: document.documentType // Store the original document type for API calls
+                  });
+                }
+              });
+            }
+          });
+        }
+
         setDownloads(combinedDownloads);
         
         // Extract unique years from the downloads data
@@ -308,8 +370,9 @@ const DownloadsPage: React.FC = () => {
         setAvailableYears(availableYears);
         
         setLoading(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching downloads:', error);
+        console.error('Error details:', error.response?.data || error.message);
         setLoading(false);
         // If API fails, fall back to mock data for development
         if (process.env.NODE_ENV === 'development') {
@@ -421,7 +484,7 @@ const DownloadsPage: React.FC = () => {
       if (docId.startsWith('compliance-') && doc.reportId && doc.attachmentId) {
         try {
           // Download from compliance report attachment endpoint
-          const response = await axios.get(`/api/compliance-reports/${doc.reportId}/attachments/${doc.attachmentId}/download`, {
+          const response = await apiService.get(`/api/compliance-reports/${doc.reportId}/attachments/${doc.attachmentId}/download`, {
             responseType: 'blob'
           });
           
@@ -439,49 +502,62 @@ const DownloadsPage: React.FC = () => {
           console.error('Error downloading compliance report attachment:', error);
           alert('Failed to download file. Please try again.');
         }
+      } else if (docId.startsWith('consultant-') && doc.reportId && doc.originalDocumentType) {
+        try {
+          // Download from consultant submission endpoint using documentType
+          const response = await apiService.get(`/api/document-submissions/${doc.reportId}/download/${encodeURIComponent(doc.originalDocumentType)}`, {
+            responseType: 'blob'
+          });
+          
+          // Create download link
+          const blob = new Blob([response.data]);
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = doc.fileName || 'download';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Error downloading consultant submission:', error);
+          alert('Failed to download file. Please try again.');
+        }
       } else {
-        // Regular document download
-        console.log(`Downloading regular document ${docId}`);
-        alert('Regular document download not implemented yet');
+        try {
+          // Regular document download using file path
+          if (doc.filePath) {
+            const response = await apiService.get('/api/document-submissions/download', {
+              params: {
+                filePath: doc.filePath,
+                fileName: doc.fileName
+              },
+              responseType: 'blob'
+            });
+            
+            // Create download link
+            const blob = new Blob([response.data]);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = doc.fileName || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } else {
+            console.error('No file path available for document');
+            alert('File path not available for this document');
+          }
+        } catch (error) {
+          console.error('Error downloading regular document:', error);
+          alert('Failed to download file. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error downloading document:', error);
       alert('Failed to download document');
     }
-  };
-
-  const handleView = async (docId: string) => {
-    try {
-      const doc = downloads.find(d => d.id === docId);
-      if (!doc) {
-        console.error('Document not found');
-        alert('Document not found');
-        return;
-      }
-
-      // Check if this is a compliance report attachment
-      if (docId.startsWith('compliance-') && doc.reportId && doc.attachmentId) {
-        try {
-          // Open in new tab for viewing
-          const url = `/api/compliance-reports/${doc.reportId}/attachments/${doc.attachmentId}/view`;
-          window.open(url, '_blank');
-        } catch (error) {
-          console.error('Error viewing compliance report attachment:', error);
-          alert('Failed to view file. Please try again.');
-        }
-      } else {
-        // Regular document view
-        navigate(`/admin/documents/${docId}`);
-      }
-    } catch (error) {
-      console.error('Error viewing document:', error);
-      alert('Failed to view document');
-    }
-  };
-
-  const handlePrint = (docId: string) => {
-    // In a real app, this would open a print dialog
-    console.log(`Printing document ${docId}`);
   };
 
   return (
@@ -839,24 +915,17 @@ const DownloadsPage: React.FC = () => {
                           <TableCell align="right">
                             <IconButton 
                               size="small" 
-                              onClick={() => handleView(doc.id)}
-                              title="View Document"
-                            >
-                              <FontAwesomeIcon icon={faEye} />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
                               onClick={() => handleDownload(doc.id)}
                               title="Download Document"
+                              sx={{
+                                color: '#667eea',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                  color: '#5a67d8'
+                                }
+                              }}
                             >
                               <FontAwesomeIcon icon={faDownload} />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handlePrint(doc.id)}
-                              title="Print Document"
-                            >
-                              <FontAwesomeIcon icon={faPrint} />
                             </IconButton>
                           </TableCell>
                         </TableRow>

@@ -975,15 +975,22 @@ exports.getVendorStatus = async (req, res) => {
 // @access  Private (Admin)
 exports.getAllSubmissions = async (req, res) => {
   try {
-    const { status, vendor, year, month, page = 1, limit = 10 } = req.query;
+    const { status, vendor, year, month, page = 1, limit = 1000, uploadedByConsultant } = req.query;
 
     // Build query
     const query = {};
 
     if (status) query.submissionStatus = status;
     if (vendor) query.vendor = vendor;
-    if (year) query.year = year;
-    if (month) query.month = month;
+    
+    // Handle year and month filtering for uploadPeriod
+    if (year) query['uploadPeriod.year'] = parseInt(year);
+    if (month) query['uploadPeriod.month'] = month;
+    
+    // Filter by consultant uploads if requested
+    if (uploadedByConsultant === 'true') {
+      query.uploadedByConsultant = true;
+    }
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -997,7 +1004,8 @@ exports.getAllSubmissions = async (req, res) => {
       .populate('consultant', 'name email')
       .populate('consultantApproval.approvedBy', 'name email')
       .populate('finalApproval.approvedBy', 'name email')
-      .populate('documents.reviewedBy', 'name email');
+      .populate('documents.reviewedBy', 'name email')
+      .populate('uploadedBy.id', 'name email role');
 
     // Get total count
     const total = await DocumentSubmission.countDocuments(query);
@@ -2965,6 +2973,286 @@ const getDocumentTypeLabel = (documentType) => {
     'ADDITIONAL_DOCUMENT': 'Additional Document'
   };
   return labels[documentType] || documentType;
+};
+
+// @desc    Upload documents on behalf of vendor (for consultants)
+// @route   POST /api/document-submissions/consultant-upload
+// @access  Private (Consultant, Admin)
+exports.consultantUploadDocument = async (req, res) => {
+  try {
+    // Check if user is a consultant or admin
+    if (req.user.role !== 'consultant' && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only consultants and admins can upload documents on behalf of vendors'
+      });
+    }
+
+    // Process upload with multer
+    const uploadMiddleware = upload.array('documents', 10); // Allow up to 10 files
+    
+    uploadMiddleware(req, res, async (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        return res.status(400).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      // Log request body and files for debugging
+      console.log('Consultant upload - Request body:', req.body);
+      console.log('Consultant upload - Request files:', req.files ? req.files.length : 'No files');
+
+      // Extract fields from request body
+      const { 
+        vendorId, 
+        documentType, 
+        title, 
+        uploadedBy, 
+        uploadedByName,
+        year,
+        month 
+      } = req.body;
+
+      // Validate required fields
+      if (!vendorId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vendor ID is required'
+        });
+      }
+
+      if (!documentType || !title) {
+        return res.status(400).json({
+          success: false,
+          message: 'Document type and title are required'
+        });
+      }
+
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one file is required'
+        });
+      }
+
+      // Verify vendor exists and get vendor details
+      const vendor = await User.findById(vendorId);
+      if (!vendor || vendor.role !== 'vendor') {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      // Check if consultant is assigned to this vendor (unless user is admin)
+      if (req.user.role === 'consultant') {
+        const assignedConsultantId = typeof vendor.assignedConsultant === 'object' 
+          ? vendor.assignedConsultant?._id || vendor.assignedConsultant?.id
+          : vendor.assignedConsultant;
+        
+        if (assignedConsultantId && assignedConsultantId.toString() !== req.user._id.toString()) {
+          return res.status(403).json({
+            success: false,
+            message: 'You can only upload documents for vendors assigned to you'
+          });
+        }
+      }
+
+      // Get current date for submission
+      const currentDate = new Date();
+      const submissionYear = year ? parseInt(year) : currentDate.getFullYear();
+      const submissionMonth = month || getMonthName(currentDate.getMonth() + 1);
+
+      // Generate unique submission ID
+      const submissionId = `SUB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Process uploaded files
+      const documents = [];
+      
+      req.files.forEach((file, index) => {
+        console.log(`Processing file ${index + 1}: ${file.originalname}`);
+        
+        // Get file extension and type
+        const fileExtension = path.extname(file.originalname).toLowerCase().substring(1);
+        let fileType = fileExtension;
+        
+        // Map file extensions to standardized types
+        const typeMapping = {
+          'pdf': 'pdf',
+          'doc': 'word',
+          'docx': 'word',
+          'xls': 'excel',
+          'xlsx': 'excel',
+          'png': 'png',
+          'jpg': 'jpeg',
+          'jpeg': 'jpeg'
+        };
+        
+        fileType = typeMapping[fileExtension] || fileExtension;
+        
+        // Create document entry
+        const document = {
+          documentType: convertDocumentType(documentType),
+          documentName: title,
+          fileName: file.filename,
+          filePath: file.filename, // Store relative path
+          fileSize: file.size,
+          fileType: fileType,
+          uploadDate: currentDate,
+          status: 'approved', // Directly approve since consultant is uploading
+          isMandatory: MONTHLY_MANDATORY_DOCUMENT_TYPES.includes(convertDocumentType(documentType)) || ANNUAL_MANDATORY_DOCUMENT_TYPES.includes(convertDocumentType(documentType)),
+          reviewDate: currentDate, // Set review date to current date
+          reviewedBy: req.user._id, // Set consultant as reviewer
+          consultantRemarks: 'Approved by consultant during upload'
+        };
+        
+        documents.push(document);
+        console.log(`Document ${index + 1} processed:`, document);
+      });
+
+      // Create new document submission
+      const newSubmission = new DocumentSubmission({
+        submissionId: submissionId,
+        vendor: vendorId,
+        uploadPeriod: {
+          year: submissionYear,
+          month: submissionMonth
+        },
+        consultant: {
+          name: uploadedByName || req.user.name || 'Consultant',
+          email: req.user.email
+        },
+        workLocation: vendor.workLocation || 'IMTMA, Bengaluru',
+        invoiceNo: `INV-${Date.now()}`, // Generate a temporary invoice number
+        documents: documents,
+        submissionStatus: 'fully_approved', // Mark as fully approved since consultant pre-approved
+        submissionDate: currentDate,
+        createdAt: currentDate,
+        lastModifiedDate: currentDate,
+        uploadedByConsultant: true, // Flag to indicate consultant upload
+        uploadedBy: {
+          id: req.user._id,
+          name: req.user.name,
+          role: req.user.role
+        },
+        // Set consultant approval since consultant uploaded
+        consultantApproval: {
+          isApproved: true,
+          approvedBy: req.user._id,
+          approvalDate: currentDate,
+          remarks: 'Auto-approved during consultant upload'
+        }
+      });
+
+      // Save the submission
+      const savedSubmission = await newSubmission.save();
+      console.log('Consultant upload - Submission saved:', savedSubmission._id);
+
+      // Create notification for vendor
+      try {
+        await Notification.create({
+          recipient: vendorId,
+          sender: req.user._id,
+          type: 'document_upload',
+          title: 'Documents Uploaded and Approved on Your Behalf',
+          message: `${req.user.name} has uploaded and approved ${documents.length} document(s) for ${submissionMonth} ${submissionYear}. Documents are now ready for admin final approval.`,
+          relatedDocument: savedSubmission._id,
+          priority: 'medium'
+        });
+
+        // Send real-time notification to vendor
+        socketService.sendToUser(vendorId.toString(), 'notification', {
+          type: 'document_upload',
+          data: {
+            title: 'Documents Uploaded and Approved on Your Behalf',
+            message: `${req.user.name} has uploaded and approved ${documents.length} document(s) for ${submissionMonth} ${submissionYear}. Documents are now ready for admin final approval.`,
+            submissionId: savedSubmission._id,
+            consultantName: req.user.name,
+            documentCount: documents.length
+          }
+        });
+      } catch (notificationError) {
+        console.error('Error creating vendor notification:', notificationError);
+      }
+
+      // Create notification for admins
+      try {
+        const admins = await User.find({ role: 'admin', isActive: true });
+        
+        const adminNotificationPromises = admins.map(async admin => {
+          const adminNotification = await Notification.create({
+            recipient: admin._id,
+            sender: req.user._id,
+            type: 'document_submission',
+            title: 'Documents Ready for Final Approval',
+            message: `${req.user.name} uploaded and approved ${documents.length} document(s) for ${vendor.name} (${submissionMonth} ${submissionYear}). Ready for final approval.`,
+            relatedDocument: savedSubmission._id,
+            priority: 'high'
+          });
+
+          // Send real-time notification to admin
+          socketService.sendToUser(admin._id.toString(), 'notification', {
+            type: 'document_submission',
+            data: {
+              title: 'Documents Ready for Final Approval',
+              message: `${req.user.name} uploaded and approved ${documents.length} document(s) for ${vendor.name} (${submissionMonth} ${submissionYear}). Ready for final approval.`,
+              submissionId: savedSubmission._id,
+              consultantName: req.user.name,
+              vendorName: vendor.name,
+              documentCount: documents.length
+            }
+          });
+
+          return adminNotification;
+        });
+
+        await Promise.all(adminNotificationPromises);
+        console.log(`Admin notifications sent to ${admins.length} admins`);
+      } catch (notificationError) {
+        console.error('Error creating admin notifications:', notificationError);
+      }
+
+      res.status(201).json({
+        success: true,
+        message: `Successfully uploaded and approved ${documents.length} document(s) for ${vendor.name}. Documents are now ready for admin final approval.`,
+        data: {
+          submissionId: savedSubmission._id,
+          submissionNumber: submissionId,
+          vendorName: vendor.name,
+          consultantName: req.user.name,
+          documentCount: documents.length,
+          uploadPeriod: `${submissionMonth} ${submissionYear}`,
+          status: 'fully_approved',
+          readyForFinalApproval: true,
+          documents: documents.map(doc => ({
+            documentType: doc.documentType,
+            documentName: doc.documentName,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            fileType: doc.fileType,
+            status: doc.status
+          }))
+        }
+      });
+
+    });
+  } catch (error) {
+    console.error('Error in consultant document upload:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not upload documents',
+      error: error.message
+    });
+  }
+};
+
+// Helper function to get month name from number
+const getMonthName = (monthNumber) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[monthNumber - 1] || 'Jan';
 };
 
 // Export notification functions for use in other controllers

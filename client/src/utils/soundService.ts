@@ -15,8 +15,21 @@ class SoundService {
   constructor() {
     // Initialize audio context on first user interaction
     this.initializeAudioContext();
-    // Preload notification sounds
-    this.preloadSounds();
+    // Only preload sounds if explicitly enabled (to avoid 404 errors)
+    if (this.shouldPreloadSounds()) {
+      this.preloadSounds().catch(error => {
+        console.debug('Sound preloading failed, will use generated sounds:', error);
+      });
+    }
+  }
+
+  /**
+   * Check if sound preloading should be enabled
+   */
+  private shouldPreloadSounds(): boolean {
+    // Only preload if explicitly enabled via environment variable or localStorage
+    return process.env.REACT_APP_ENABLE_SOUND_FILES === 'true' || 
+           localStorage.getItem('enableSoundFiles') === 'true';
   }
 
   private initializeAudioContext() {
@@ -28,9 +41,9 @@ class SoundService {
   }
 
   /**
-   * Preload notification sound files
+   * Preload notification sound files (only if they exist)
    */
-  private preloadSounds() {
+  private async preloadSounds() {
     const soundFiles = {
       success: '/sounds/success.mp3',
       error: '/sounds/error.mp3',
@@ -39,16 +52,25 @@ class SoundService {
       default: '/sounds/notification.mp3'
     };
 
-    Object.entries(soundFiles).forEach(([type, url]) => {
+    // Check if sound files exist before trying to load them
+    for (const [type, url] of Object.entries(soundFiles)) {
       try {
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audio.volume = 0.3;
-        this.audioCache.set(type, audio);
+        // Use fetch to check if file exists without loading it
+        const response = await fetch(url, { method: 'HEAD' });
+        if (response.ok) {
+          const audio = new Audio(url);
+          audio.preload = 'auto';
+          audio.volume = 0.3;
+          this.audioCache.set(type, audio);
+          console.debug(`Loaded sound file: ${type}`);
+        } else {
+          console.debug(`Sound file not found: ${url}, will use generated sound`);
+        }
       } catch (error) {
-        console.warn(`Failed to preload sound ${type}:`, error);
+        // File doesn't exist or network error - silently continue
+        console.debug(`Sound file not available: ${url}, will use generated sound`);
       }
-    });
+    }
   }
 
   /**

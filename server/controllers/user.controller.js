@@ -165,7 +165,8 @@ exports.createUser = async (req, res) => {
       companyRegNo,
       taxId,
       password: providedPassword, 
-      assignedConsultant 
+      assignedConsultant,
+      requiresLoginApproval
     } = req.body;
 
     // Check if user already exists
@@ -194,6 +195,15 @@ exports.createUser = async (req, res) => {
       companyRegNo,
       taxId
     };
+
+    // Handle requiresLoginApproval field for vendors
+    if (role === 'vendor') {
+      // If requiresLoginApproval is explicitly provided, use it
+      // Otherwise, default to true for vendors (as per the model default)
+      userData.requiresLoginApproval = requiresLoginApproval !== undefined ? 
+        (requiresLoginApproval === 'true' || requiresLoginApproval === true) : 
+        true;
+    }
 
     // Add profile image if uploaded
     if (req.file) {

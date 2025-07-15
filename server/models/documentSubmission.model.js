@@ -280,7 +280,21 @@ const DocumentSubmissionSchema = new mongoose.Schema({
       default: false
     },
     resubmissionDate: Date
-  }]
+  }],
+  
+  // Consultant upload tracking
+  uploadedByConsultant: {
+    type: Boolean,
+    default: false
+  },
+  uploadedBy: {
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    name: String,
+    role: String
+  }
 }, {
   timestamps: true
 });

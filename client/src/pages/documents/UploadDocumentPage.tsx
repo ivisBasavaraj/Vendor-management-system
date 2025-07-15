@@ -216,6 +216,9 @@ const UploadDocumentPage: React.FC = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState<Date | null>(null);
   const [agreementPeriod, setAgreementPeriod] = useState<string>('');
+  const [agreementEndDate, setAgreementEndDate] = useState<Date | null>(null);
+  const [isAgreementExpiringSoon, setIsAgreementExpiringSoon] = useState<boolean>(false);
+  const [isAgreementExpired, setIsAgreementExpired] = useState<boolean>(false);
   const [userDataLoaded, setUserDataLoaded] = useState<boolean>(false);
   const [consultant, setConsultant] = useState('');
   const [consultantOptions, setConsultantOptions] = useState<string[]>([]);
@@ -378,6 +381,25 @@ const UploadDocumentPage: React.FC = () => {
     console.log('Current Month:', currentMonth);
   }, []);
 
+  // Function to check if agreement is expiring within 30 days
+  const checkAgreementExpiry = (endDate: Date | null): boolean => {
+    if (!endDate) return false;
+    
+    const today = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+    
+    return endDate <= thirtyDaysFromNow && endDate >= today;
+  };
+
+  // Function to check if agreement has already expired
+  const checkAgreementExpired = (endDate: Date | null): boolean => {
+    if (!endDate) return false;
+    
+    const today = new Date();
+    return endDate < today;
+  };
+
   // Fetch consultant options and assigned consultant
   useEffect(() => {
     const fetchConsultantData = async () => {
@@ -399,6 +421,41 @@ const UploadDocumentPage: React.FC = () => {
           if (userData.role === 'vendor' && userData.agreementPeriod) {
             console.log('Setting agreement period from user data:', userData.agreementPeriod);
             setAgreementPeriod(userData.agreementPeriod);
+            
+            // Try to fetch more structured agreement period from DocumentSubmission model
+            try {
+              const submissionResponse = await apiService.documents.getVendorSubmissions({ 
+                vendorId: userData._id,
+                limit: 1 // Just get the latest submission to check agreement period
+              });
+              
+              if (submissionResponse.data.success && submissionResponse.data.data.length > 0) {
+                const latestSubmission = submissionResponse.data.data[0];
+                console.log('Latest submission data:', latestSubmission);
+                
+                if (latestSubmission.agreementPeriod && latestSubmission.agreementPeriod.endDate) {
+                  const endDate = new Date(latestSubmission.agreementPeriod.endDate);
+                  console.log('Found structured agreement end date from submission:', endDate);
+                  setAgreementEndDate(endDate);
+                  setIsAgreementExpiringSoon(checkAgreementExpiry(endDate));
+                  setIsAgreementExpired(checkAgreementExpired(endDate));
+                  return; // Use structured data, don't parse string
+                }
+              }
+            } catch (submissionError) {
+              console.log('Could not fetch structured agreement period from submissions:', submissionError);
+              // Fall back to parsing the string from user data
+            }
+            
+            // If no structured data found, parse the agreement period string
+            console.log('Parsing agreement period string:', userData.agreementPeriod);
+            const parsedEndDate = parseAgreementPeriod(userData.agreementPeriod);
+            if (parsedEndDate) {
+              console.log('Parsed agreement end date from string:', parsedEndDate);
+              setAgreementEndDate(parsedEndDate);
+              setIsAgreementExpiringSoon(checkAgreementExpiry(parsedEndDate));
+              setIsAgreementExpired(checkAgreementExpired(parsedEndDate));
+            }
           } else {
             console.log('Agreement period not set. Role:', userData.role, 'Agreement period:', userData.agreementPeriod);
           }
@@ -448,9 +505,128 @@ const UploadDocumentPage: React.FC = () => {
     determineAvailableDocumentTypes();
   }, [currentMonth, currentYear, userDataLoaded]);
 
-  // Debug agreement period changes
+  // Function to parse agreement period and extract end date
+  const parseAgreementPeriod = (agreementPeriodStr: string): Date | null => {
+    if (!agreementPeriodStr) return null;
+    
+    // Try to extract date patterns from the agreement period string
+    // Common formats: "2024-2025", "April 2024 - March 2025", "Annual Contract (2024-2025)", etc.
+    
+    // Pattern 1: Look for year ranges like "2024-2025" or "(2024-2025)"
+    const yearRangeMatch = agreementPeriodStr.match(/(\d{4})-(\d{4})/);
+    if (yearRangeMatch) {
+      const endYear = parseInt(yearRangeMatch[2]);
+      // Assume agreement ends on March 31st of the end year (common for annual contracts)
+      return new Date(endYear, 2, 31); // March is month 2 (0-indexed)
+    }
+    
+    // Pattern 2: Look for specific end dates like "March 2025", "Mar 2025", "April 2024 - March 2025"
+    const monthYearMatch = agreementPeriodStr.match(/(?:to|until|-)\s*(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})/i);
+    if (monthYearMatch) {
+      const monthName = monthYearMatch[1].toLowerCase();
+      const endYear = parseInt(monthYearMatch[2]);
+      
+      const monthMap: { [key: string]: number } = {
+        'january': 0, 'jan': 0,
+        'february': 1, 'feb': 1,
+        'march': 2, 'mar': 2,
+        'april': 3, 'apr': 3,
+        'may': 4,
+        'june': 5, 'jun': 5,
+        'july': 6, 'jul': 6,
+        'august': 7, 'aug': 7,
+        'september': 8, 'sep': 8,
+        'october': 9, 'oct': 9,
+        'november': 10, 'nov': 10,
+        'december': 11, 'dec': 11
+      };
+      
+      const monthIndex = monthMap[monthName];
+      if (monthIndex !== undefined) {
+        // Get the last day of the month
+        const lastDay = new Date(endYear, monthIndex + 1, 0).getDate();
+        return new Date(endYear, monthIndex, lastDay);
+      }
+    }
+    
+    // Pattern 2b: Look for just "March 2025", "Mar 2025" at the end
+    const endMonthMatch = agreementPeriodStr.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})$/i);
+    if (endMonthMatch) {
+      const monthName = endMonthMatch[1].toLowerCase();
+      const endYear = parseInt(endMonthMatch[2]);
+      
+      const monthMap: { [key: string]: number } = {
+        'january': 0, 'jan': 0,
+        'february': 1, 'feb': 1,
+        'march': 2, 'mar': 2,
+        'april': 3, 'apr': 3,
+        'may': 4,
+        'june': 5, 'jun': 5,
+        'july': 6, 'jul': 6,
+        'august': 7, 'aug': 7,
+        'september': 8, 'sep': 8,
+        'october': 9, 'oct': 9,
+        'november': 10, 'nov': 10,
+        'december': 11, 'dec': 11
+      };
+      
+      const monthIndex = monthMap[monthName];
+      if (monthIndex !== undefined) {
+        // Get the last day of the month
+        const lastDay = new Date(endYear, monthIndex + 1, 0).getDate();
+        return new Date(endYear, monthIndex, lastDay);
+      }
+    }
+    
+    // Pattern 3: Look for date formats like "31/03/2025", "31-03-2025", "2025-03-31"
+    const dateFormats = [
+      /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/, // DD/MM/YYYY or DD-MM-YYYY
+      /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/, // YYYY/MM/DD or YYYY-MM-DD
+    ];
+    
+    for (const format of dateFormats) {
+      const match = agreementPeriodStr.match(format);
+      if (match) {
+        if (format === dateFormats[0]) {
+          // DD/MM/YYYY format
+          const day = parseInt(match[1]);
+          const month = parseInt(match[2]) - 1; // 0-indexed
+          const year = parseInt(match[3]);
+          return new Date(year, month, day);
+        } else {
+          // YYYY/MM/DD format
+          const year = parseInt(match[1]);
+          const month = parseInt(match[2]) - 1; // 0-indexed
+          const day = parseInt(match[3]);
+          return new Date(year, month, day);
+        }
+      }
+    }
+    
+    // If no pattern matches, return null
+    return null;
+  };
+
+  // Debug agreement period changes and check expiry
   useEffect(() => {
     console.log('Agreement period state changed:', agreementPeriod);
+    
+    if (agreementPeriod) {
+      const endDate = parseAgreementPeriod(agreementPeriod);
+      setAgreementEndDate(endDate);
+      
+      const isExpiringSoon = checkAgreementExpiry(endDate);
+      const isExpired = checkAgreementExpired(endDate);
+      setIsAgreementExpiringSoon(isExpiringSoon);
+      setIsAgreementExpired(isExpired);
+      
+      console.log('Agreement period analysis:', {
+        agreementPeriod,
+        parsedEndDate: endDate,
+        isExpiringSoon,
+        daysUntilExpiry: endDate ? Math.ceil((endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null
+      });
+    }
   }, [agreementPeriod]);
 
   // Handle drag events
@@ -639,6 +815,12 @@ const UploadDocumentPage: React.FC = () => {
 
     if (!agreementPeriod) {
       setError('Agreement Period is not loaded. Please refresh the page or contact administrator.');
+      return;
+    }
+
+    // Check if agreement has expired
+    if (isAgreementExpired) {
+      setError('Cannot upload documents: Your agreement has expired. Please contact your administrator to renew your agreement.');
       return;
     }
 
@@ -861,6 +1043,40 @@ const UploadDocumentPage: React.FC = () => {
           </div>
         )}
 
+        {/* Agreement Expired Error */}
+        {isAgreementExpired && agreementEndDate && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4">
+            <div className="flex items-start">
+              <FontAwesomeIcon icon={faExclamationCircle} className="text-red-500 mr-2 mt-1" />
+              <div>
+                <h3 className="font-medium text-red-800">Agreement Expired</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  Your agreement period expired on <strong>{agreementEndDate.toLocaleDateString()}</strong> 
+                  ({Math.abs(Math.ceil((agreementEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} days ago).
+                  You cannot upload documents until your agreement is renewed. Please contact your administrator immediately.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Agreement Expiry Warning */}
+        {!isAgreementExpired && isAgreementExpiringSoon && agreementEndDate && (
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4">
+            <div className="flex items-start">
+              <FontAwesomeIcon icon={faExclamationCircle} className="text-yellow-500 mr-2 mt-1" />
+              <div>
+                <h3 className="font-medium text-yellow-800">Agreement Expiring Soon</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Your agreement period expires on <strong>{agreementEndDate.toLocaleDateString()}</strong> 
+                  ({Math.ceil((agreementEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining).
+                  Please contact your administrator to renew your agreement before uploading documents.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <form onSubmit={handleSubmit} className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -962,8 +1178,24 @@ const UploadDocumentPage: React.FC = () => {
 
               {/* Agreement Period */}
               <div>
-                <label htmlFor="agreementPeriod" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="agreementPeriod" className={`block text-sm font-medium mb-2 ${
+                  isAgreementExpired 
+                    ? 'text-red-800' 
+                    : isAgreementExpiringSoon 
+                      ? 'text-red-700' 
+                      : 'text-gray-700 dark:text-gray-300'
+                }`}>
                   Agreement Period
+                  {isAgreementExpired && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-200 text-red-900">
+                      Expired
+                    </span>
+                  )}
+                  {!isAgreementExpired && isAgreementExpiringSoon && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      Expiring Soon
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -972,11 +1204,37 @@ const UploadDocumentPage: React.FC = () => {
                   value={agreementPeriod}
                   readOnly
                   placeholder="Agreement period will be loaded from your profile"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 dark:text-gray-300 cursor-not-allowed"
+                  className={`w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-600 dark:text-gray-300 cursor-not-allowed ${
+                    isAgreementExpired 
+                      ? 'border-red-600 bg-red-100 dark:bg-red-900/30 dark:border-red-500' 
+                      : isAgreementExpiringSoon 
+                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-400' 
+                        : 'border-gray-300 dark:border-gray-600'
+                  }`}
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  This field is set by the administrator and cannot be modified.
-                </p>
+                <div className="mt-1">
+                  <p className={`text-xs ${
+                    isAgreementExpired 
+                      ? 'text-red-700 dark:text-red-400' 
+                      : isAgreementExpiringSoon 
+                        ? 'text-yellow-600 dark:text-yellow-400' 
+                        : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    This field is set by the administrator and cannot be modified.
+                  </p>
+                  {isAgreementExpired && agreementEndDate && (
+                    <p className="text-xs text-red-700 dark:text-red-400 mt-1 font-medium">
+                      ❌ Agreement expired on {agreementEndDate.toLocaleDateString()} 
+                      ({Math.abs(Math.ceil((agreementEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} days ago)
+                    </p>
+                  )}
+                  {!isAgreementExpired && isAgreementExpiringSoon && agreementEndDate && (
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 font-medium">
+                      ⚠️ Agreement expires on {agreementEndDate.toLocaleDateString()} 
+                      ({Math.ceil((agreementEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining)
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Consultant Email/Name */}
@@ -1214,12 +1472,22 @@ const UploadDocumentPage: React.FC = () => {
               </button>
               <button
                 type="submit"
-                className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  loading ? "opacity-70 cursor-not-allowed" : ""
+                className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  isAgreementExpired 
+                    ? "bg-gray-400 cursor-not-allowed opacity-70" 
+                    : loading 
+                      ? "bg-blue-600 opacity-70 cursor-not-allowed" 
+                      : "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
                 }`}
-                disabled={loading}
+                disabled={loading || isAgreementExpired}
+                title={isAgreementExpired ? "Cannot upload: Agreement has expired" : ""}
               >
-                {loading ? "Uploading..." : "Upload Document"}
+                {isAgreementExpired 
+                  ? "Agreement Expired" 
+                  : loading 
+                    ? "Uploading..." 
+                    : "Upload Document"
+                }
               </button>
             </div>
           </form>

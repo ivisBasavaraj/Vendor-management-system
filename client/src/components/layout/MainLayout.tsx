@@ -59,7 +59,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       { name: 'Dashboard', path: '/dashboard', icon: <FontAwesomeIcon icon={faHome} /> },
       { name: 'Vendors List', path: '/vendors-list', icon: <FontAwesomeIcon icon={faBuilding} /> },
       { name: 'Approved Documents', path: '/approved-documents', icon: <FontAwesomeIcon icon={faCheckCircle} /> },
-      { name: 'Compliance', path: '/compliance-verification', icon: <FontAwesomeIcon icon={faSearch} /> },
       { name: 'Status ', path: '/vendor-status', icon: <FontAwesomeIcon icon={faChartBar} /> },
       { name: 'Profile', path: '/profile', icon: <FontAwesomeIcon icon={faUser} /> },
       { name: 'Notifications', path: '/notifications', icon: <FontAwesomeIcon icon={faBell} /> },

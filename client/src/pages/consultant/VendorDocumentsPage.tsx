@@ -111,17 +111,18 @@ const VendorDocumentsPage: React.FC = () => {
   // Upload document states
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
-  const [uploadDocumentType, setUploadDocumentType] = useState('');
-  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadDocumentType, setUploadDocumentType] = useState('COMPLIANCE_CERTIFICATE');
+  const [uploadTitle, setUploadTitle] = useState('COMPLIANCE_CERTIFICATE');
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   
-  // Compliance report form states
+  // Compliance form states
+  const [showComplianceForm, setShowComplianceForm] = useState(false);
   const [auditFindings, setAuditFindings] = useState('');
   const [complianceStatus, setComplianceStatus] = useState('');
   const [complianceRemarks, setComplianceRemarks] = useState('');
-  const [showComplianceForm, setShowComplianceForm] = useState(false);
+
 
   // Only consultants and admins can access this page
   if (!user || (user.role !== 'consultant' && user.role !== 'admin')) {
@@ -278,10 +279,25 @@ const VendorDocumentsPage: React.FC = () => {
             };
           });
 
+          // Filter out compliance certificate documents from this submission
+          const nonComplianceDocuments = transformedDocuments.filter((doc: any) => {
+            const docType = (doc.documentType || '').toUpperCase().trim();
+            const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
+                                docType === 'COMPLIANCE CERTIFICATE' ||
+                                docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
+
+            return !isCompliance;
+          });
+          
+          // Only return submission if it has non-compliance documents
+          if (nonComplianceDocuments.length === 0) {
+            return null;
+          }
+
           return {
             _id: submission._id,
             submissionDate: ensureValidDate(submission.createdAt || submission.submissionDate) || new Date().toISOString(),
-            documents: transformedDocuments
+            documents: nonComplianceDocuments
           };
         }).filter(Boolean);
         
@@ -597,10 +613,25 @@ const VendorDocumentsPage: React.FC = () => {
               return documentObj;
             });
 
+            // Filter out compliance certificate documents from this submission
+            const nonComplianceDocuments = transformedDocuments.filter((doc: any) => {
+              const docType = (doc.documentType || '').toUpperCase().trim();
+              const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
+                                  docType === 'COMPLIANCE CERTIFICATE' ||
+                                  docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
+
+              return !isCompliance;
+            });
+            
+            // Only return submission if it has non-compliance documents
+            if (nonComplianceDocuments.length === 0) {
+              return null;
+            }
+
             return {
               _id: submission._id,
               submissionDate: ensureValidDate(submission.createdAt || submission.submissionDate) || new Date().toISOString(),
-              documents: transformedDocuments
+              documents: nonComplianceDocuments
             };
           }).filter(Boolean);
           
@@ -832,9 +863,18 @@ const VendorDocumentsPage: React.FC = () => {
         });
       }
       
+      // Filter out compliance certificates from the filtered documents
+      const nonComplianceDocs = filteredDocs.filter((doc: Document) => {
+        const docType = (doc.documentType || '').toUpperCase().trim();
+        const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
+                            docType === 'COMPLIANCE CERTIFICATE' ||
+                            docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
+        return !isCompliance;
+      });
+      
       return {
         ...submission,
-        documents: filteredDocs
+        documents: nonComplianceDocs
       };
     }).filter(submission => submission.documents.length > 0); // Only keep submissions with documents after filtering
     
@@ -1148,9 +1188,21 @@ const VendorDocumentsPage: React.FC = () => {
     }
   };
 
+  // Helper function to filter out compliance certificate documents
+  const filterOutComplianceCertificates = (documents: any[]) => {
+    return documents.filter(doc => {
+      const docType = (doc.documentType || '').toUpperCase().trim();
+      const isCompliance = docType === 'COMPLIANCE_CERTIFICATE' || 
+                          docType === 'COMPLIANCE CERTIFICATE' ||
+                          docType.includes('COMPLIANCE') && docType.includes('CERTIFICATE');
+      return !isCompliance;
+    });
+  };
+
   // Helper function to check if all documents in a submission are approved
   const areAllDocumentsApproved = (submission: Submission): boolean => {
-    return submission.documents.length > 0 && submission.documents.every(doc => doc.status === 'approved');
+    const filteredDocuments = filterOutComplianceCertificates(submission.documents);
+    return filteredDocuments.length > 0 && filteredDocuments.every(doc => doc.status === 'approved');
   };
 
   // Helper function to safely format dates
@@ -1334,14 +1386,21 @@ const VendorDocumentsPage: React.FC = () => {
       const vendorData = {
         name: vendor?.name || 'Unknown Vendor',
         company: vendor?.company || 'Unknown Company',
-        email: vendor?.email || 'Unknown Email'
+        email: vendor?.email || 'Unknown Email',
+        address: vendor?.company || 'Address not specified',
+        workLocation: vendor?.workLocation || 'Not specified',
+        agreementPeriod: vendor?.agreementPeriod || 
+          (vendor?.contractStartDate && vendor?.contractEndDate ? 
+            `${format(new Date(vendor.contractStartDate), 'MMM dd, yyyy')} - ${format(new Date(vendor.contractEndDate), 'MMM dd, yyyy')}` : 
+            'Not specified')
       };
 
-      // Calculate compliance metrics
-      const totalDocuments = submission.documents.length;
-      const approvedDocuments = submission.documents.filter(doc => doc.status === 'approved').length;
-      const rejectedDocuments = submission.documents.filter(doc => doc.status === 'rejected').length;
-      const pendingDocuments = submission.documents.filter(doc => doc.status === 'pending' || doc.status === 'under_review').length;
+      // Calculate compliance metrics (excluding compliance certificates)
+      const filteredDocuments = filterOutComplianceCertificates(submission.documents);
+      const totalDocuments = filteredDocuments.length;
+      const approvedDocuments = filteredDocuments.filter(doc => doc.status === 'approved').length;
+      const rejectedDocuments = filteredDocuments.filter(doc => doc.status === 'rejected').length;
+      const pendingDocuments = filteredDocuments.filter(doc => doc.status === 'pending' || doc.status === 'under_review').length;
       
       // Calculate compliance rate
       const complianceRate = totalDocuments > 0 ? Math.round((approvedDocuments / totalDocuments) * 100) : 0;
@@ -1356,25 +1415,24 @@ const VendorDocumentsPage: React.FC = () => {
         overallStatus = 'Under Review';
       }
 
-      // Check regulatory compliance based on document types
-      const documentTypes = submission.documents.map(doc => doc.documentType);
+      // Check regulatory compliance based on document types (excluding compliance certificates)
+      const documentTypes = filteredDocuments.map(doc => doc.documentType);
       const complianceMetrics = {
         totalRequired: totalDocuments,
         totalSubmitted: totalDocuments,
-        totalApproved: approvedDocuments,
-        totalRejected: rejectedDocuments,
+        approved: approvedDocuments,
+        rejected: rejectedDocuments,
+        pending: pendingDocuments,
         complianceRate: complianceRate,
         overallStatus: overallStatus,
-        pfCompliance: documentTypes.some(type => type.includes('PF') || type.includes('EPF')) && 
-                     submission.documents.filter(doc => (doc.documentType.includes('PF') || doc.documentType.includes('EPF')) && doc.status === 'approved').length > 0,
-        esiCompliance: documentTypes.some(type => type.includes('ESI') || type.includes('ESIC')) && 
-                      submission.documents.filter(doc => (doc.documentType.includes('ESI') || doc.documentType.includes('ESIC')) && doc.status === 'approved').length > 0,
-        ptCompliance: documentTypes.some(type => type.includes('PROFESSIONAL_TAX') || type.includes('PT')) && 
-                     submission.documents.filter(doc => (doc.documentType.includes('PROFESSIONAL_TAX') || doc.documentType.includes('PT')) && doc.status === 'approved').length > 0,
-        lwfCompliance: documentTypes.some(type => type.includes('LABOUR_WELFARE_FUND') || type.includes('LWF')) && 
-                      submission.documents.filter(doc => (doc.documentType.includes('LABOUR_WELFARE_FUND') || doc.documentType.includes('LWF')) && doc.status === 'approved').length > 0,
-        invoiceCompliance: documentTypes.some(type => type.includes('INVOICE')) && 
-                          submission.documents.filter(doc => doc.documentType.includes('INVOICE') && doc.status === 'approved').length > 0,
+        hasESI: documentTypes.includes('ESI_REGISTRATION'),
+        hasPF: documentTypes.includes('PF_REGISTRATION'),
+        hasLabourWelfare: documentTypes.includes('LABOUR_WELFARE_FUND'),
+        hasInvoice: documentTypes.includes('INVOICE'),
+        hasContract: documentTypes.includes('CONTRACT'),
+        hasBankStatement: documentTypes.includes('BANK_STATEMENT'),
+        hasECR: documentTypes.includes('ECR'),
+        hasFormT: documentTypes.includes('FORM_T_MUSTER_ROLL'),
         recommendations: [] as string[],
         auditorName: user?.name || 'System Consultant',
         auditReview: auditFindings || `Comprehensive review of ${totalDocuments} documents submitted for compliance verification. All documents have been evaluated against IMTMA standards and regulatory requirements.`,
@@ -1387,50 +1445,52 @@ const VendorDocumentsPage: React.FC = () => {
       if (complianceMetrics.complianceRate < 100) {
         complianceMetrics.recommendations.push('Complete submission of all required documents');
       }
-      if (!complianceMetrics.pfCompliance) {
-        complianceMetrics.recommendations.push('Ensure PF/EPF compliance documentation is submitted and approved');
+      
+      if (!complianceMetrics.hasESI) {
+        complianceMetrics.recommendations.push('Submit ESI Registration certificate');
       }
-      if (!complianceMetrics.esiCompliance) {
-        complianceMetrics.recommendations.push('Submit and get approval for ESI/ESIC related documents');
-      }
-      if (!complianceMetrics.invoiceCompliance) {
-        complianceMetrics.recommendations.push('Submit valid invoice documentation');
+      
+      if (!complianceMetrics.hasPF) {
+        complianceMetrics.recommendations.push('Submit PF Registration certificate');
       }
 
-      // Prepare submission data for the report
+      // Prepare submission data
       const submissionData = {
         submissionId: submission._id,
-        workLocation: vendor?.workLocation || 'As per agreement',
+        submissionNumber: `SUB-${submission._id.slice(-8).toUpperCase()}`,
+        workLocation: vendor?.workLocation || 'Not specified',
+        locationOfWork: vendor?.workLocation || 'Not specified',
         agreementPeriod: vendor?.agreementPeriod || 
           (vendor?.contractStartDate && vendor?.contractEndDate ? 
             `${format(new Date(vendor.contractStartDate), 'MMM dd, yyyy')} - ${format(new Date(vendor.contractEndDate), 'MMM dd, yyyy')}` : 
-            'As per contract terms'),
+            'Not specified'),
         uploadPeriod: {
           month: format(new Date(submission.submissionDate), 'MMMM'),
           year: new Date(submission.submissionDate).getFullYear()
         },
-        documents: submission.documents.map(doc => ({
+        documents: filteredDocuments.map(doc => ({
           documentName: doc.title,
           documentType: doc.documentType,
-          isMandatory: true, // You might want to determine this based on document type
+          isMandatory: true,
           status: doc.status,
-          reviewDate: doc.submissionDate, // Using submission date as review date for now
-          consultantRemarks: doc.reviewNotes || 'Approved - Document meets compliance requirements'
+          submissionDate: doc.submissionDate,
+          reviewNotes: doc.reviewNotes || 'No specific notes',
+          consultantRemarks: doc.consultantRemarks || '',
+          remarks: doc.remarks || '',
+          consultantNotes: doc.consultantNotes || '',
+          approvalRemarks: doc.approvalRemarks || '',
+          rejectionRemarks: doc.rejectionRemarks || '',
+          statusRemarks: doc.statusRemarks || '',
+          files: doc.files || []
         }))
       };
-
-      console.log('Generating compliance verification report with data:', {
-        vendorData,
-        submissionData,
-        complianceMetrics
-      });
 
       // Generate the PDF using our utility function
       const pdf = await generateComplianceVerificationReport(
         vendorData,
         submissionData,
         complianceMetrics,
-        `Compliance Verification Report - ${submission._id.slice(-8).toUpperCase()}`
+        'Compliance Verification Report'
       );
 
       // Save the PDF with submission ID
@@ -1438,6 +1498,9 @@ const VendorDocumentsPage: React.FC = () => {
 
       setReportSuccess(true);
       alert('Compliance verification report generated successfully!');
+      
+      // Close the compliance form modal
+      resetComplianceForm();
     } catch (error) {
       console.error('Error generating compliance verification report:', error);
       setReportError('Failed to generate compliance verification report');
@@ -1446,6 +1509,39 @@ const VendorDocumentsPage: React.FC = () => {
     } finally {
       setGeneratingReport(false);
     }
+  };
+
+  // Handle compliance form submission
+  const handleComplianceFormSubmit = async () => {
+    if (!auditFindings.trim() || !complianceStatus.trim() || !complianceRemarks.trim()) {
+      alert('Please fill in all compliance form fields before generating the report.');
+      return;
+    }
+    
+    // Find the submission based on the stored document
+    if (!selectedDocument || !selectedDocument.submissionId) {
+      alert('No submission selected. Please try again.');
+      return;
+    }
+    
+    // Find the submission in the submissions array
+    const submission = submissions.find(sub => sub._id === selectedDocument.submissionId);
+    
+    if (!submission) {
+      alert('Could not find the selected submission. Please try again.');
+      return;
+    }
+    
+    // Generate the compliance report with the form data
+    await handleGenerateComplianceReport(submission);
+  };
+
+  // Reset compliance form
+  const resetComplianceForm = () => {
+    setAuditFindings('');
+    setComplianceStatus('');
+    setComplianceRemarks('');
+    setShowComplianceForm(false);
   };
 
   // Handle document upload
@@ -1478,6 +1574,13 @@ const VendorDocumentsPage: React.FC = () => {
       formData.append('title', uploadTitle.trim());
       formData.append('uploadedBy', user?.id || '');
       formData.append('uploadedByName', user?.name || 'Consultant');
+      
+      // Add current month and year for document tracking
+      const currentDate = new Date();
+      const currentMonth = currentDate.toLocaleString('default', { month: 'short' });
+      const currentYear = currentDate.getFullYear();
+      formData.append('month', currentMonth);
+      formData.append('year', currentYear.toString());
 
       console.log('Uploading documents:', {
         vendorId,
@@ -1521,62 +1624,34 @@ const VendorDocumentsPage: React.FC = () => {
   const handleCloseUploadModal = () => {
     setShowUploadModal(false);
     setUploadFiles(null);
-    setUploadDocumentType('');
-    setUploadTitle('');
+    setUploadDocumentType('COMPLIANCE_CERTIFICATE');
+    setUploadTitle('COMPLIANCE_CERTIFICATE');
     setUploadError(null);
     setUploadSuccess(null);
   };
 
-  // Handle compliance form submission
-  const handleComplianceFormSubmit = async () => {
-    if (!auditFindings.trim() || !complianceStatus.trim() || !complianceRemarks.trim()) {
-      alert('Please fill in all compliance form fields before generating the report.');
-      return;
-    }
-    
-    // Find the submission based on the stored document
-    if (!selectedDocument || !selectedDocument.submissionId) {
-      alert('No submission selected. Please try again.');
-      return;
-    }
-    
-    // Find the submission in the submissions array
-    const submission = submissions.find(sub => sub._id === selectedDocument.submissionId);
-    
-    if (!submission) {
-      alert('Could not find the selected submission. Please try again.');
-      return;
-    }
-    
-    // Generate the compliance report with the form data
-    await handleGenerateComplianceReport(submission);
-  };
 
-  // Reset compliance form
-  const resetComplianceForm = () => {
-    setAuditFindings('');
-    setComplianceStatus('');
-    setComplianceRemarks('');
-    setShowComplianceForm(false);
-  };
+
+  // Filter out compliance certificates from documents
+  const filteredDocumentsForCounts = filterOutComplianceCertificates(documents);
 
   // Check if all documents are approved
-  const allDocumentsApproved = documents.length > 0 && documents.every(doc => doc.status === 'approved');
+  const allDocumentsApproved = filteredDocumentsForCounts.length > 0 && filteredDocumentsForCounts.every(doc => doc.status === 'approved');
 
   // Get document counts by status
   const documentCounts = {
-    total: documents.length,
-    approved: documents.filter(doc => doc.status === 'approved').length,
-    pending: documents.filter(doc => doc.status === 'pending').length,
-    underReview: documents.filter(doc => doc.status === 'under_review').length,
-    rejected: documents.filter(doc => doc.status === 'rejected').length,
-    resubmitted: documents.filter(doc => doc.status === 'resubmitted').length
+    total: filteredDocumentsForCounts.length,
+    approved: filteredDocumentsForCounts.filter(doc => doc.status === 'approved').length,
+    pending: filteredDocumentsForCounts.filter(doc => doc.status === 'pending').length,
+    underReview: filteredDocumentsForCounts.filter(doc => doc.status === 'under_review').length,
+    rejected: filteredDocumentsForCounts.filter(doc => doc.status === 'rejected').length,
+    resubmitted: filteredDocumentsForCounts.filter(doc => doc.status === 'resubmitted').length
   };
 
   // Debug: Log document statuses to understand the data
   console.log('Document status breakdown:', {
-    totalDocuments: documents.length,
-    documentStatuses: documents.map(doc => ({ id: doc._id, title: doc.title, status: doc.status })),
+    totalDocuments: filteredDocumentsForCounts.length,
+    documentStatuses: filteredDocumentsForCounts.map(doc => ({ id: doc._id, title: doc.title, status: doc.status })),
     counts: documentCounts
   });
 
@@ -1756,16 +1831,7 @@ const VendorDocumentsPage: React.FC = () => {
                     Upload Documents
                   </Button>
                   
-                  {allDocumentsApproved && (
-                    <Button 
-                      variant="primary" 
-                      onClick={() => setShowComplianceForm(true)}
-                      className="flex items-center px-4 py-3 text-base bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0 shadow-md"
-                    >
-                      <DocumentCheckIcon className="h-5 w-5 mr-2" />
-                      Compliance Report
-                    </Button>
-                  )}
+
                 </div>
               </div>
             </div>
@@ -1793,7 +1859,7 @@ const VendorDocumentsPage: React.FC = () => {
                         <CalendarIcon className="h-6 w-6 text-blue-500" />
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Submission: {submission._id.slice(-8).toUpperCase()}
+                            Document Submission
                           </h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Submitted on {safeFormatDate(submission.submissionDate, 'MMMM dd, yyyy \'at\' h:mm a')}
@@ -1802,7 +1868,7 @@ const VendorDocumentsPage: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Badge variant="info" className="px-3 py-1">
-                          {submission.documents.length} Document{submission.documents.length !== 1 ? 's' : ''}
+                          {filterOutComplianceCertificates(submission.documents).length} Document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''}
                         </Badge>
                         {areAllDocumentsApproved(submission) && (
                           <Badge variant="success" className="px-3 py-1 flex items-center">
@@ -1817,7 +1883,7 @@ const VendorDocumentsPage: React.FC = () => {
                   {/* Documents Grid */}
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {submission.documents.map((document) => (
+                      {submission.documents.filter((document) => document.documentType !== 'COMPLIANCE_CERTIFICATE').map((document) => (
                         <motion.div
                           key={document._id}
                           initial={{ opacity: 0, scale: 0.95 }}
@@ -1942,7 +2008,7 @@ const VendorDocumentsPage: React.FC = () => {
                                 All Documents Approved! 🎉
                               </p>
                               <p className="text-sm text-green-600 dark:text-green-400">
-                                {submission.documents.length} document{submission.documents.length !== 1 ? 's' : ''} ready for report generation
+                                {filterOutComplianceCertificates(submission.documents).length} document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''} ready for report generation
                               </p>
                             </div>
                           </div>
@@ -1966,6 +2032,7 @@ const VendorDocumentsPage: React.FC = () => {
                                 </>
                               )}
                             </Button>
+                            
                             <Button
                               variant="secondary"
                               size="md"
@@ -1973,11 +2040,11 @@ const VendorDocumentsPage: React.FC = () => {
                                 // Store the current submission for later use
                                 setSelectedDocument({
                                   _id: submission._id,
-                                  title: `Submission ${submission._id.slice(-8)}`,
+                                  title: 'Document Submission',
                                   documentType: 'Submission',
                                   submissionDate: submission.submissionDate,
                                   status: 'pending',
-                                  fileCount: submission.documents.length,
+                                  fileCount: filterOutComplianceCertificates(submission.documents).length,
                                   vendorId: vendorId || '',
                                   submissionId: submission._id
                                 });
@@ -2005,6 +2072,7 @@ const VendorDocumentsPage: React.FC = () => {
                                 </>
                               )}
                             </Button>
+
                           </div>
                         </div>
                       </div>
@@ -2359,16 +2427,10 @@ const VendorDocumentsPage: React.FC = () => {
             <select
               value={uploadDocumentType}
               onChange={(e) => setUploadDocumentType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
             >
-              <option value="">Select document type</option>
-              <option value="PF_REGISTRATION">PF Registration</option>
-              <option value="ESI_REGISTRATION">ESI Registration</option>
-              <option value="LABOUR_WELFARE_FUND">Labour Welfare Fund</option>
-              <option value="INVOICE">Invoice</option>
-              <option value="CONTRACT">Contract</option>
               <option value="COMPLIANCE_CERTIFICATE">Compliance Certificate</option>
-              <option value="OTHER">Other</option>
             </select>
           </div>
           
@@ -2434,63 +2496,64 @@ const VendorDocumentsPage: React.FC = () => {
           </div>
         </div>
       </Modal>
-      
+
       {/* Compliance Form Modal */}
       <Modal
         isOpen={showComplianceForm}
         onClose={resetComplianceForm}
-        title="Compliance Verification Details"
+        title="Compliance Verification Report"
         size="lg"
       >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Please fill in the compliance verification details before generating the report.
-          </p>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Audit Review & Findings *
-            </label>
-            <textarea
-              value={auditFindings}
-              onChange={(e) => setAuditFindings(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              placeholder="Enter detailed audit review and findings..."
-            />
+        <div className="p-6">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Audit Findings & Review
+              </label>
+              <textarea
+                value={auditFindings}
+                onChange={(e) => setAuditFindings(e.target.value)}
+                placeholder="Enter detailed audit findings and review comments..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                rows={4}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Compliance Status
+              </label>
+              <Select
+                value={complianceStatus}
+                onChange={(e) => setComplianceStatus(e.target.value)}
+                className="w-full"
+                required
+              >
+                <option value="">Select compliance status</option>
+                <option value="FULLY_COMPLIANT">Fully Compliant</option>
+                <option value="PARTIALLY_COMPLIANT">Partially Compliant</option>
+                <option value="NON_COMPLIANT">Non-Compliant</option>
+                <option value="UNDER_REVIEW">Under Review</option>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Compliance Remarks
+              </label>
+              <textarea
+                value={complianceRemarks}
+                onChange={(e) => setComplianceRemarks(e.target.value)}
+                placeholder="Enter specific compliance remarks and recommendations..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                rows={4}
+                required
+              />
+            </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Compliance Status *
-            </label>
-            <select
-              value={complianceStatus}
-              onChange={(e) => setComplianceStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            >
-              <option value="">Select compliance status</option>
-              <option value="FULLY_COMPLIANT">Fully Compliant</option>
-              <option value="PARTIALLY_COMPLIANT">Partially Compliant</option>
-              <option value="NON_COMPLIANT">Non-Compliant</option>
-              <option value="UNDER_REVIEW">Under Review</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Compliance Remarks *
-            </label>
-            <textarea
-              value={complianceRemarks}
-              onChange={(e) => setComplianceRemarks(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              placeholder="Enter compliance remarks and recommendations..."
-            />
-          </div>
-          
-          <div className="flex justify-end space-x-2 pt-4">
+
+          <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
             <Button
               variant="outline"
               onClick={resetComplianceForm}
@@ -2508,6 +2571,7 @@ const VendorDocumentsPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
     </MainLayout>
   );
 };

@@ -5,7 +5,7 @@ const activityLogger = require('../utils/activityLogger');
 // Register a new user
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, company, phone, address } = req.body;
+    const { name, email, password, role, company, phone, address, requiresLoginApproval } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -16,8 +16,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create new user
-    const user = await User.create({
+    // Create user data
+    const userData = {
       name,
       email,
       password,
@@ -25,7 +25,19 @@ exports.register = async (req, res) => {
       company,
       phone,
       address
-    });
+    };
+
+    // Handle requiresLoginApproval field for vendors
+    if ((role || 'vendor') === 'vendor') {
+      // If requiresLoginApproval is explicitly provided, use it
+      // Otherwise, default to true for vendors (as per the model default)
+      userData.requiresLoginApproval = requiresLoginApproval !== undefined ? 
+        (requiresLoginApproval === 'true' || requiresLoginApproval === true) : 
+        true;
+    }
+
+    // Create new user
+    const user = await User.create(userData);
 
     // Send token response
     await sendTokenResponse(user, 201, res);
