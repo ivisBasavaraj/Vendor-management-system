@@ -17,6 +17,7 @@ import {
   XCircleIcon
 } from '@heroicons/react/24/outline';
 import apiService from '../../utils/api';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 interface Vendor {
   _id: string;
@@ -25,6 +26,7 @@ interface Vendor {
   email?: string;
   phone?: string;
   address?: string;
+  logo?: string;
   status?: 'active' | 'inactive' | 'pending';
   documentCount?: {
     total: number;
@@ -345,11 +347,33 @@ const VendorListPage: React.FC = () => {
               <Card key={vendor._id}>
                 <div className="p-4">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {vendor.company || 'No Company'}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">{vendor.name || 'Unknown'}</p>
+                    <div className="flex items-center space-x-4">
+                      {/* Vendor Logo */}
+                      <div className="flex-shrink-0">
+                        {vendor.logo ? (
+                          <img
+                            className="h-12 w-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                            src={getFullImageUrl(vendor.logo)}
+                            alt={vendor.name || vendor.company || 'Vendor'}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold ${vendor.logo ? 'hidden' : ''}`}>
+                          {(vendor.company || vendor.name || 'V').charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                      
+                      {/* Vendor Info */}
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {vendor.company || 'No Company'}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400">{vendor.name || 'Unknown'}</p>
+                      </div>
                     </div>
                     <div className="mt-2 md:mt-0 flex items-center space-x-2">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

@@ -6,12 +6,14 @@ interface DocumentViewerProps {
   documentUrl: string;
   fileName?: string;
   mimeType?: string;
+  filePath?: string; // Add filePath prop for download functionality
 }
 
 const DocumentViewer: React.FC<DocumentViewerProps> = ({ 
   documentUrl, 
   fileName = 'document',
-  mimeType = 'application/pdf' 
+  mimeType = 'application/pdf',
+  filePath
 }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,19 +24,40 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
     setPreviewError(false);
   }, [documentUrl]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Create a temporary anchor element
+      console.log('Starting download for:', { documentUrl, fileName, filePath });
+      
+      // Import apiService dynamically to avoid circular dependencies
+      const { default: apiService } = await import('../../utils/api');
+      
+      // Use the provided filePath or extract from documentUrl
+      let downloadPath = filePath || documentUrl;
+      if (documentUrl.includes('/api/document-submissions/view?filePath=')) {
+        const urlParams = new URLSearchParams(documentUrl.split('?')[1]);
+        downloadPath = urlParams.get('filePath') || downloadPath;
+      }
+      
+      console.log('Downloading file with path:', downloadPath);
+      
+      // Call the download API
+      const response = await apiService.documents.downloadFile(downloadPath, fileName);
+      
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = documentUrl;
-      link.download = fileName;
+      link.href = url;
+      link.download = fileName || 'document';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
+      console.log('Download completed successfully');
       setLoading(false);
     } catch (err) {
       console.error('Error downloading document:', err);

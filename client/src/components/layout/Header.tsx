@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -146,8 +147,22 @@ const Header: React.FC = () => {
               className="flex items-center space-x-2 focus:outline-none"
               aria-label="User menu"
             >
-              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white">
-                {user?.name?.charAt(0) || 'G'}
+              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white overflow-hidden">
+                {user?.logo ? (
+                  <img
+                    className="w-full h-full object-cover"
+                    src={getFullImageUrl(user.logo)}
+                    alt={user.name || 'User'}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <span className={`${user?.logo ? 'hidden' : ''}`}>
+                  {user?.name?.charAt(0) || 'G'}
+                </span>
               </div>
               <span className="hidden md:block text-gray-700">{user?.name || 'Guest'}</span>
               <svg

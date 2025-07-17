@@ -180,11 +180,27 @@ const apiService = {
     getById: (id: string) => 
       api.get(`${API_PREFIX}/users/${id}`),
     
-    create: (userData: any) => 
-      api.post(`${API_PREFIX}/users`, userData),
+    create: (userData: any) => {
+      // If userData is FormData, set appropriate headers
+      const config = userData instanceof FormData ? {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      } : {};
+      
+      return api.post(`${API_PREFIX}/users`, userData, config);
+    },
     
-    update: (id: string, userData: any) => 
-      api.put(`${API_PREFIX}/users/${id}`, userData),
+    update: (id: string, userData: any) => {
+      // If userData is FormData, set appropriate headers
+      const config = userData instanceof FormData ? {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      } : {};
+      
+      return api.put(`${API_PREFIX}/users/${id}`, userData, config);
+    },
     
     delete: (id: string) => 
       api.delete(`${API_PREFIX}/users/${id}`),
@@ -506,12 +522,23 @@ const apiService = {
       
       console.log(`Processed file path for download: ${processedPath}`);
       
+      // Try the download endpoint first, if it fails fall back to viewFile
       return api.get(`${API_PREFIX}/document-submissions/download`, {
-        params: { filePath: processedPath, fileName, format: 'pdf' },
-        responseType: 'blob',
-        headers: {
-          'Accept': 'application/pdf'
-        }
+        params: { filePath: processedPath, fileName },
+        responseType: 'blob'
+      }).catch(error => {
+        console.log(`Download endpoint failed: ${error}. Falling back to viewFile...`);
+        // Fall back to viewFile endpoint directly
+        return api.get(`${API_PREFIX}/document-submissions/view`, {
+          params: { filePath: processedPath },
+          responseType: 'blob'
+        }).catch(viewError => {
+          console.log(`View endpoint also failed: ${viewError}. Trying legacy documents endpoint...`);
+          return api.get(`${API_PREFIX}/documents/view`, {
+            params: { filePath: processedPath },
+            responseType: 'blob'
+          });
+        });
       });
     },
       
@@ -657,6 +684,11 @@ const apiService = {
             'Accept': mimeType
           }
         });
+      }).catch(finalError => {
+        console.log(`All document view endpoints failed: ${finalError}`);
+        // Create a descriptive error for the user
+        const errorMsg = 'Document viewing is not available. The file viewing service is not configured on the server.';
+        throw new Error(errorMsg);
       });
     },
       

@@ -317,13 +317,26 @@ exports.updatePassword = async (req, res) => {
 // Update user details
 exports.updateDetails = async (req, res) => {
   try {
+    const { getProfileImageUrl } = require('../utils/profileImageUpload');
+    
     const fieldsToUpdate = {
       name: req.body.name,
       email: req.body.email,
       company: req.body.company,
       phone: req.body.phone,
-      address: req.body.address
+      address: req.body.address,
+      contactPerson: req.body.contactPerson,
+      website: req.body.website,
+      registrationNumber: req.body.registrationNumber,
+      taxId: req.body.taxId,
+      industry: req.body.industry,
+      description: req.body.description
     };
+
+    // Handle profile image upload
+    if (req.file) {
+      fieldsToUpdate.logo = getProfileImageUrl(req.file.filename);
+    }
 
     // Remove undefined fields
     Object.keys(fieldsToUpdate).forEach(key => 
@@ -337,7 +350,7 @@ exports.updateDetails = async (req, res) => {
         new: true,
         runValidators: true
       }
-    );
+    ).select('-password');
 
     res.status(200).json({
       success: true,

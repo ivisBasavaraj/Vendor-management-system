@@ -19,14 +19,15 @@ const router = express.Router();
 
 // Import middleware
 const { protect, authorize } = require('../middlewares/auth.middleware');
+const { profileImageUpload } = require('../utils/profileImageUpload');
 
 // User routes
 router.get('/', protect, authorize('admin'), getUsers);
 router.get('/vendors', protect, getVendors);
 router.get('/consultants', protect, getConsultants);
 router.get('/:id', protect, getUserById);
-router.post('/', protect, authorize('admin'), createUser);
-router.put('/:id', protect, authorize('admin'), updateUser);
+router.post('/', protect, authorize('admin'), profileImageUpload.single('profileImage'), createUser);
+router.put('/:id', protect, authorize('admin'), profileImageUpload.single('profileImage'), updateUser);
 router.delete('/:id', protect, authorize('admin'), deleteUser);
 
 // Analytics routes

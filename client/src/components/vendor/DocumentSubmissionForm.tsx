@@ -79,6 +79,98 @@ const isDocumentMandatory = (documentType: string, selectedMonth: string) => {
 // All mandatory document types (combined) - keeping for backward compatibility
 const MANDATORY_DOCUMENTS = [...MONTHLY_MANDATORY_DOCUMENTS, ...ANNUAL_MANDATORY_DOCUMENTS, ...DECEMBER_MANDATORY_DOCUMENTS];
 
+// Utility function to parse agreement period string and calculate end date
+const parseAgreementPeriod = (agreementPeriod: string, createdAt: string): { endDate: Date | null, durationInMonths: number } => {
+  if (!agreementPeriod || !createdAt) {
+    return { endDate: null, durationInMonths: 0 };
+  }
+
+  const periodString = agreementPeriod.trim();
+  const creationDate = new Date(createdAt);
+  
+  // If creation date is invalid, return null
+  if (isNaN(creationDate.getTime())) {
+    return { endDate: null, durationInMonths: 0 };
+  }
+
+  // Check if agreement period is in date range format (e.g., "1 July 2025 to 15 July 2025")
+  const dateRangeMatch = periodString.match(/(\d{1,2}\s+\w+\s+\d{4})\s+to\s+(\d{1,2}\s+\w+\s+\d{4})/i);
+  if (dateRangeMatch) {
+    const endDateStr = dateRangeMatch[2];
+    const endDate = new Date(endDateStr);
+    
+    if (!isNaN(endDate.getTime())) {
+      // Calculate duration in months for reference
+      const timeDiff = endDate.getTime() - creationDate.getTime();
+      const durationInMonths = Math.round(timeDiff / (1000 * 60 * 60 * 24 * 30.44)); // Average days per month
+      
+      return { endDate, durationInMonths };
+    }
+  }
+
+  // If not a date range, parse as period description
+  const periodStringLower = periodString.toLowerCase();
+  let durationInMonths = 12; // Default to 1 year
+
+  // Parse common agreement period formats
+  if (periodStringLower.includes('annual') || periodStringLower.includes('yearly') || periodStringLower.includes('1 year')) {
+    durationInMonths = 12;
+  } else if (periodStringLower.includes('2 year') || periodStringLower.includes('two year')) {
+    durationInMonths = 24;
+  } else if (periodStringLower.includes('3 year') || periodStringLower.includes('three year')) {
+    durationInMonths = 36;
+  } else if (periodStringLower.includes('6 month') || periodStringLower.includes('six month')) {
+    durationInMonths = 6;
+  } else if (periodStringLower.includes('18 month') || periodStringLower.includes('eighteen month')) {
+    durationInMonths = 18;
+  } else if (periodStringLower.includes('permanent') || periodStringLower.includes('indefinite')) {
+    // For permanent contracts, don't show expiry warning
+    return { endDate: null, durationInMonths: 0 };
+  } else {
+    // Try to extract number from string (e.g., "5 Year Contract" -> 5)
+    const numberMatch = periodStringLower.match(/(\d+)\s*(year|month)/);
+    if (numberMatch) {
+      const number = parseInt(numberMatch[1], 10);
+      const unit = numberMatch[2];
+      
+      if (unit === 'year') {
+        durationInMonths = number * 12;
+      } else if (unit === 'month') {
+        durationInMonths = number;
+      }
+    }
+  }
+
+  // Calculate end date by adding duration to creation date
+  const endDate = new Date(creationDate);
+  endDate.setMonth(endDate.getMonth() + durationInMonths);
+  
+  return { endDate, durationInMonths };
+};
+
+// Function to check if agreement is expiring within 30 days
+const checkAgreementExpiry = (agreementPeriod: string, createdAt: string) => {
+  const { endDate } = parseAgreementPeriod(agreementPeriod, createdAt);
+  
+  if (!endDate) {
+    return {
+      isExpiring: false,
+      daysRemaining: 0,
+      endDate: null
+    };
+  }
+
+  const now = new Date();
+  const timeDiff = endDate.getTime() - now.getTime();
+  const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+  return {
+    isExpiring: daysRemaining <= 30 && daysRemaining > 0,
+    daysRemaining: Math.max(0, daysRemaining),
+    endDate
+  };
+};
+
 // Function to map document type IDs to valid document types for backend
 const getValidDocumentType = (documentType: string): string => {
   // Map specific document types to backend enum values
@@ -192,6 +284,15 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [documentDetails, setDocumentDetails] = useState<DocumentDetails | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [agreementExpiryWarning, setAgreementExpiryWarning] = useState<{
+    isExpiring: boolean;
+    daysRemaining: number;
+    endDate: Date | null;
+  }>({
+    isExpiring: false,
+    daysRemaining: 0,
+    endDate: null
+  });
   
   // Load assigned consultant and document details (if in resubmit mode)
   useEffect(() => {
@@ -211,6 +312,24 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
             if (userData.agreementPeriod) {
               console.log('Setting agreement period from user data:', userData.agreementPeriod);
               setAgreementPeriod(userData.agreementPeriod);
+              
+              // Check if agreement is expiring within 30 days
+              const expiryInfo = checkAgreementExpiry(userData.agreementPeriod, userData.createdAt);
+              setAgreementExpiryWarning(expiryInfo);
+              
+              console.log('Agreement expiry check result:', {
+                agreementPeriod: userData.agreementPeriod,
+                createdAt: userData.createdAt,
+                endDate: expiryInfo.endDate,
+                isExpiring: expiryInfo.isExpiring,
+                daysRemaining: expiryInfo.daysRemaining
+              });
+              
+              if (expiryInfo.isExpiring) {
+                console.log(`⚠️ Agreement expiring in ${expiryInfo.daysRemaining} days!`);
+              } else if (expiryInfo.endDate && expiryInfo.daysRemaining <= 0) {
+                console.log(`❌ Agreement has already expired! (${Math.abs(expiryInfo.daysRemaining)} days ago)`);
+              }
             }
             
             // Handle assigned consultant
@@ -744,6 +863,88 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
           {mode === 'resubmit' ? 'Resubmit Document' : 'Document Submission'}
         </h2>
         
+        {/* Agreement Expiry Warning Banner */}
+        {agreementExpiryWarning.isExpiring && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-md">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-500 mr-3" />
+              <div>
+                <h3 className="text-lg font-medium text-red-800 dark:text-red-200">
+                  Agreement Expiring Soon!
+                </h3>
+                <p className="text-red-700 dark:text-red-300 mt-1">
+                  {agreementExpiryWarning.daysRemaining === 0 
+                    ? 'Your agreement expires today!' 
+                    : `Your agreement expires in ${agreementExpiryWarning.daysRemaining} day${agreementExpiryWarning.daysRemaining !== 1 ? 's' : ''}!`
+                  }
+                  {agreementExpiryWarning.endDate && (
+                    <span className="ml-1">
+                      ({agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })})
+                    </span>
+                  )}
+                </p>
+                <p className="text-red-700 dark:text-red-300 mt-1 font-medium">
+                  Please contact your consultant immediately to renew your agreement to avoid service interruption.
+                </p>
+                {consultantEmail && (
+                  <div className="mt-3">
+                    <a
+                      href={`mailto:${consultantEmail}?subject=Urgent: Agreement Renewal Request&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement is expiring soon and I need immediate assistance with the renewal process.%0D%0A%0D%0AExpiry Date: ${agreementExpiryWarning.endDate ? agreementExpiryWarning.endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}%0D%0A%0D%0APlease contact me as soon as possible.%0D%0A%0D%0AThank you.`}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+                    >
+                      Contact Consultant Now
+                    </a>
+                    <span className="ml-3 text-sm text-red-600 dark:text-red-400">
+                      {consultantName} ({consultantEmail})
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Agreement Expired Banner */}
+        {!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0 && (
+          <div className="mb-6 bg-red-800 dark:bg-red-900 border-l-4 border-red-600 p-4 rounded-md">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-200 mr-3" />
+              <div>
+                <h3 className="text-lg font-medium text-red-100 dark:text-red-200">
+                  Agreement Has Expired
+                </h3>
+                <p className="text-red-200 dark:text-red-300 mt-1">
+                  Your agreement expired on {agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })} ({Math.abs(agreementExpiryWarning.daysRemaining)} day{Math.abs(agreementExpiryWarning.daysRemaining) !== 1 ? 's' : ''} ago)
+                </p>
+                <p className="text-red-200 dark:text-red-300 mt-1 font-medium">
+                  Please contact your consultant immediately to renew your agreement. Service may be interrupted.
+                </p>
+                {consultantEmail && (
+                  <div className="mt-3">
+                    <a
+                      href={`mailto:${consultantEmail}?subject=URGENT: Expired Agreement Renewal&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement has expired and I need immediate assistance with the renewal process.%0D%0A%0D%0AExpiry Date: ${agreementExpiryWarning.endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}%0D%0A%0D%0APlease contact me urgently to avoid service interruption.%0D%0A%0D%0AThank you.`}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+                    >
+                      Contact Consultant URGENTLY
+                    </a>
+                    <span className="ml-3 text-sm text-red-300">
+                      {consultantName} ({consultantEmail})
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-md">
             <div className="flex">
@@ -890,19 +1091,127 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
                 <div>
                   <label htmlFor="agreementPeriod" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Agreement Period
+                    {agreementExpiryWarning.isExpiring && (
+                      <span className="ml-2 inline-flex items-center">
+                        <ExclamationTriangleIcon className="h-4 w-4 text-red-500 mr-1" />
+                        <span className="text-red-500 text-xs font-medium">Expiring Soon!</span>
+                      </span>
+                    )}
+                    {!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0 && (
+                      <span className="ml-2 inline-flex items-center">
+                        <ExclamationTriangleIcon className="h-4 w-4 text-red-600 mr-1" />
+                        <span className="text-red-600 text-xs font-medium">Expired!</span>
+                      </span>
+                    )}
                   </label>
-                  <input
-                    type="text"
-                    id="agreementPeriod"
-                    value={agreementPeriod}
-                    readOnly
-                    placeholder="Agreement period will be loaded from your profile"
-                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-100 dark:bg-gray-600 dark:text-gray-300 shadow-sm cursor-not-allowed bg-gray-50"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    This field is set by the administrator and cannot be modified.
-                  </p>
-                </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="agreementPeriod"
+                      value={agreementPeriod}
+                      readOnly
+                      placeholder="Agreement period will be loaded from your profile"
+                      className={`block w-full rounded-md shadow-sm cursor-not-allowed bg-gray-50 ${
+                        agreementExpiryWarning.isExpiring
+                          ? 'border-red-300 dark:border-red-500 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200'
+                          : (!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0)
+                          ? 'border-red-400 dark:border-red-500 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                          : 'border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                      }`}
+                    />
+                    {agreementExpiryWarning.isExpiring && (
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
+                      </div>
+                    )}
+                    {!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0 && (
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {agreementExpiryWarning.isExpiring ? (
+                    <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 rounded-md">
+                      <div className="flex items-center">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                            Your agreement is expiring soon!
+                          </p>
+                          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                            {agreementExpiryWarning.daysRemaining === 0 
+                              ? 'Your agreement expires today' 
+                              : `Your agreement expires in ${agreementExpiryWarning.daysRemaining} day${agreementExpiryWarning.daysRemaining !== 1 ? 's' : ''}`
+                            }
+                            {agreementExpiryWarning.endDate && (
+                              <span className="ml-1">
+                                ({agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm text-red-700 dark:text-red-300 mt-1 font-medium">
+                            Contact your consultant immediately to renew your agreement.
+                          </p>
+                          {consultantEmail && (
+                            <div className="mt-2 flex items-center space-x-2">
+                              <a
+                                href={`mailto:${consultantEmail}?subject=Agreement Renewal Request&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement is expiring soon. Please help me with the renewal process.%0D%0A%0D%0AThank you.`}
+                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+                              >
+                                Contact Consultant
+                              </a>
+                              <span className="text-xs text-red-600 dark:text-red-400">
+                                {consultantEmail}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0) ? (
+                    <div className="mt-2 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/30 rounded-md">
+                      <div className="flex items-center">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                            Your agreement has expired!
+                          </p>
+                          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                            Agreement expired on {agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })} ({Math.abs(agreementExpiryWarning.daysRemaining)} day{Math.abs(agreementExpiryWarning.daysRemaining) !== 1 ? 's' : ''} ago)
+                          </p>
+                          <p className="text-sm text-red-700 dark:text-red-300 mt-1 font-medium">
+                            Contact your consultant immediately to renew your agreement.
+                          </p>
+                          {consultantEmail && (
+                            <div className="mt-2 flex items-center space-x-2">
+                              <a
+                                href={`mailto:${consultantEmail}?subject=URGENT: Expired Agreement Renewal&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement has expired and I need immediate assistance with the renewal process.%0D%0A%0D%0AExpiry Date: ${agreementExpiryWarning.endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}%0D%0A%0D%0APlease contact me urgently.%0D%0A%0D%0AThank you.`}
+                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+                              >
+                                Contact Consultant URGENTLY
+                              </a>
+                              <span className="text-xs text-red-600 dark:text-red-400">
+                                {consultantEmail}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This field is set by the administrator and cannot be modified.
+                    </p>
+                  )}</div>
                 
                 {/* Consultant Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

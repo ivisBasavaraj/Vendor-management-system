@@ -7,7 +7,6 @@ import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import {
   DocumentTextIcon,
-  ArrowDownTrayIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronDownIcon,
@@ -15,7 +14,9 @@ import {
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  XMarkIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 
 // Define years and months for dropdown
@@ -87,6 +88,8 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
+  const [selectedDocumentForView, setSelectedDocumentForView] = useState<Document | null>(null);
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState<boolean>(false);
   
   // Fetch submissions based on filters
   useEffect(() => {
@@ -226,106 +229,19 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
     }
   };
   
-  // Download verification document
-  const handleDownloadVerification = async (submissionId: string) => {
-    try {
-      const response = await apiService.documents.downloadVerificationDocument(submissionId);
-      
-      // Create a download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `verification_${submissionId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error('Error downloading verification document:', err);
-      setError('Failed to download verification document');
-    }
-  };
-  
   // Handle resubmission
   const handleResubmit = (submissionId: string) => {
     // Navigate to resubmission page with the submission ID
     window.location.href = `/documents/resubmit/${submissionId}`;
   };
   
-  // Handle document viewing
-  const handleViewDocument = async (filePath: string) => {
-    if (!filePath) {
-      setError('Document file path is missing');
-      return;
-    }
-    
-    try {
-      const response = await apiService.documents.viewFile(filePath);
-      
-      // Use utility function to get MIME type
-      const mimeType = getMimeTypeFromFileName(filePath);
-      
-      // Create a blob URL with the correct MIME type
-      const blob = new Blob([response.data], { type: mimeType });
-      const url = window.URL.createObjectURL(blob);
-      
-      // Check if file can be previewed in browser
-      if (canPreviewInBrowser(filePath)) {
-        // Open PDF and images in a new tab for preview
-        window.open(url, '_blank');
-      } else {
-        // For Word, Excel, and other files, trigger download
-        const fileName = filePath.split('/').pop() || 'document';
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }
-    } catch (err) {
-      console.error('Error viewing document:', err);
-      setError('Failed to view document. Please try again later.');
-    }
+  // Handle document viewing (show document details)
+  const handleViewDocument = (document: Document) => {
+    setSelectedDocumentForView(document);
+    setIsDocumentModalOpen(true);
   };
-  
-  // Filter submissions by search query and date (as backup to API filtering)
-  const filteredSubmissions = Array.isArray(submissions) ? submissions.filter(submission => {
-    // Apply search query filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = (
-        submission.submissionId?.toLowerCase().includes(query) ||
-        (submission.consultant?.name && submission.consultant.name.toLowerCase().includes(query)) ||
-        (submission.consultant?.email && submission.consultant.email.toLowerCase().includes(query)) ||
-        (submission.period && submission.period.toLowerCase().includes(query)) ||
-        (Array.isArray(submission.documents) && submission.documents.some(doc => 
-          getDocumentDisplayName(doc).toLowerCase().includes(query) ||
-          (doc.type && doc.type.toLowerCase().includes(query))
-        ))
-      );
-      
-      if (!matchesSearch) return false;
-    }
-    
-    // Apply date filtering as backup (in case API filtering doesn't work properly)
-    if (selectedYear && submission.submissionDate) {
-      const submissionDate = new Date(submission.submissionDate);
-      const submissionYear = submissionDate.getFullYear();
-      
-      if (submissionYear !== selectedYear) return false;
-      
-      if (selectedMonth && selectedMonth !== 'All') {
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const submissionMonth = monthNames[submissionDate.getMonth()];
-        
-        if (submissionMonth !== selectedMonth) return false;
-      }
-    }
-    
-    return true;
-  }) : [];
+
+
   
   // Get readable document name from document type
   const getDocumentDisplayName = (doc: Document): string => {
@@ -393,7 +309,45 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
     // Last resort - return the original name or a default
     return doc.name || doc.title || 'Document';
   };
-
+  
+  // Filter submissions by search query and date (as backup to API filtering)
+  const filteredSubmissions = Array.isArray(submissions) ? submissions.filter(submission => {
+    // Apply search query filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = (
+        submission.submissionId?.toLowerCase().includes(query) ||
+        (submission.consultant?.name && submission.consultant.name.toLowerCase().includes(query)) ||
+        (submission.consultant?.email && submission.consultant.email.toLowerCase().includes(query)) ||
+        (submission.period && submission.period.toLowerCase().includes(query)) ||
+        (Array.isArray(submission.documents) && submission.documents.some(doc => 
+          getDocumentDisplayName(doc).toLowerCase().includes(query) ||
+          (doc.type && doc.type.toLowerCase().includes(query))
+        ))
+      );
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Apply date filtering as backup (in case API filtering doesn't work properly)
+    if (selectedYear && submission.submissionDate) {
+      const submissionDate = new Date(submission.submissionDate);
+      const submissionYear = submissionDate.getFullYear();
+      
+      if (submissionYear !== selectedYear) return false;
+      
+      if (selectedMonth && selectedMonth !== 'All') {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const submissionMonth = monthNames[submissionDate.getMonth()];
+        
+        if (submissionMonth !== selectedMonth) return false;
+      }
+    }
+    
+    return true;
+  }) : [];
+  
   // Calculate submission status based on document statuses
   const calculateSubmissionStatus = (documents: Document[]): string => {
     if (!documents || documents.length === 0) {
@@ -673,17 +627,6 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
                             )}
                           </Button>
                           
-                          {calculateSubmissionStatus(submission.documents) === 'approved' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDownloadVerification(submission.submissionId)}
-                              title="Download Verification"
-                            >
-                              <ArrowDownTrayIcon className="h-5 w-5 text-green-500" />
-                            </Button>
-                          )}
-                          
                           {(submission.status === 'rejected' || submission.status === 'requires_resubmission') && (
                             <Button
                               variant="outline"
@@ -743,9 +686,8 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => handleViewDocument(doc.filePath || '')}
-                                            disabled={!doc.filePath}
-                                            title={doc.filePath ? 'View Document' : 'Document not available for viewing'}
+                                            onClick={() => handleViewDocument(doc)}
+                                            title="View Document Details"
                                             className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                           >
                                             <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
@@ -806,6 +748,145 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
           </div>
         )}
       </div>
+      
+      {/* Document Details Modal */}
+      {isDocumentModalOpen && selectedDocumentForView && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                Document Details
+              </h2>
+              <button
+                onClick={() => setIsDocumentModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Document Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Document Type
+                </label>
+                <div className="flex items-center">
+                  <DocumentTextIcon className="h-5 w-5 text-blue-500 mr-2" />
+                  <span className="text-gray-900 dark:text-white">
+                    {getDocumentDisplayName(selectedDocumentForView)}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Document Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <Badge variant={getStatusBadgeVariant(selectedDocumentForView.status)}>
+                  {formatStatus(selectedDocumentForView.status)}
+                </Badge>
+              </div>
+              
+              {/* Upload Date */}
+              {selectedDocumentForView.uploadDate && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Upload Date
+                  </label>
+                  <span className="text-gray-900 dark:text-white">
+                    {new Date(selectedDocumentForView.uploadDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              )}
+              
+              {/* Review Date */}
+              {selectedDocumentForView.reviewDate && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Review Date
+                  </label>
+                  <span className="text-gray-900 dark:text-white">
+                    {new Date(selectedDocumentForView.reviewDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              )}
+              
+              {/* Consultant Status */}
+              {selectedDocumentForView.consultantStatus && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Consultant Status
+                  </label>
+                  <Badge variant={getStatusBadgeVariant(selectedDocumentForView.consultantStatus)}>
+                    {formatStatus(selectedDocumentForView.consultantStatus)}
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Remarks/Comments */}
+              {(selectedDocumentForView.consultantRemarks || selectedDocumentForView.remarks || selectedDocumentForView.reviewNotes) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Consultant Remarks
+                  </label>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                      {selectedDocumentForView.consultantRemarks || 
+                       selectedDocumentForView.remarks || 
+                       selectedDocumentForView.reviewNotes || 
+                       'No remarks available'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* File Information */}
+              {selectedDocumentForView.filePath && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    File Information
+                  </label>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      📄 Document file has been uploaded and is stored in the system.
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      File Name: {selectedDocumentForView.filePath.split('/').pop() || 'Unknown'}
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 italic mt-1">
+                      Note: Direct file viewing is not available in this version.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex justify-end pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsDocumentModalOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

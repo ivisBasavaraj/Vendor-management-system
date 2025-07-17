@@ -134,60 +134,20 @@ const UserRegistrationPage: React.FC = () => {
         formDataToSend.append('profileImage', profileImage);
       }
 
-      // Create user
-      // Define userData with any additional properties
-      const userData: {
-        name: string;
-        email: string;
-        password: string;
-        role: string;
-        company: string;
-        phone: string;
-        address: string;
-        requiresLoginApproval: boolean;
-        assignedConsultantId?: string;
-        assignedVendorId?: string;
-        agreementPeriod?: string;
-      } = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: formData.role,
-        company: formData.company,
-        phone: formData.phone,
-        address: formData.address,
-        requiresLoginApproval: formData.role === 'vendor' ? formData.requiresLoginApproval : false
-      };
-      
-      // Add agreement period for vendors
-      if (formData.role === 'vendor') {
-        userData.agreementPeriod = formData.agreementPeriod;
-      }
-      
       // Add assignment data if applicable
       if (formData.role === 'vendor' && formData.assignedConsultantId) {
-        userData.assignedConsultantId = formData.assignedConsultantId;
+        formDataToSend.append('assignedConsultantId', formData.assignedConsultantId);
       }
       
       if (formData.role === 'consultant' && formData.assignedVendorId) {
-        userData.assignedVendorId = formData.assignedVendorId;
+        formDataToSend.append('assignedVendorId', formData.assignedVendorId);
       }
       
-      const response = await apiService.users.create(userData);
+      // Create user using FormData to support file upload
+      const response = await apiService.users.create(formDataToSend);
 
       if (response.data.success) {
-        // If we have an assignment, make the assignment call
-        if (response.data.data && formData.role === 'vendor' && formData.assignedConsultantId) {
-          try {
-            const userId = response.data.data._id || response.data.data.id;
-            await apiService.users.assignConsultant(
-              userId,
-              formData.assignedConsultantId
-            );
-          } catch (assignErr) {
-            console.error('Error assigning consultant to vendor:', assignErr);
-          }
-        }
+        // Assignment is now handled directly in the create API call
         setSuccess(`User ${formData.name} has been successfully created!`);
         
         // Reset form

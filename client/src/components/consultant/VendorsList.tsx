@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { getFullImageUrl } from '../../utils/imageUtils';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -26,6 +27,7 @@ interface Vendor {
   email: string;
   company: string;
   phone: string;
+  logo?: string;
   isActive: boolean;
   analytics?: {
     totalDocuments: number;
@@ -410,8 +412,22 @@ const VendorsList: React.FC = () => {
                       <tr key={vendor._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                              <BuildingOfficeIcon className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                            <div className="flex-shrink-0 h-10 w-10">
+                              {vendor.logo ? (
+                                <img
+                                  className="h-10 w-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                                  src={getFullImageUrl(vendor.logo)}
+                                  alt={vendor.name || vendor.company || 'Vendor'}
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold ${vendor.logo ? 'hidden' : ''}`}>
+                                {(vendor.company || vendor.name || 'V').charAt(0).toUpperCase()}
+                              </div>
                             </div>
                             <div className="ml-4">
                               <div 

@@ -9,6 +9,7 @@ export interface User {
   email: string;
   role: UserRole;
   company?: string;
+  logo?: string;
   requiresLoginApproval?: boolean;
   agreementPeriod?: string;
 }

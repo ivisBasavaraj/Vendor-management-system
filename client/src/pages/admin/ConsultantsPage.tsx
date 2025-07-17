@@ -47,6 +47,7 @@ import axios from 'axios';
 import apiService from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 // Mock data for consultants
 const mockConsultants = [
@@ -368,17 +369,21 @@ const ConsultantsPage: React.FC = () => {
                       hover
                     >
                       <div className="h-24 bg-gradient-to-r from-purple-500 to-purple-700 flex items-center justify-center">
-                        {consultant.avatar ? (
+                        {consultant.logo || consultant.avatar ? (
                           <img 
-                            src={consultant.avatar} 
+                            src={getFullImageUrl(consultant.logo || consultant.avatar)} 
                             alt={consultant.name} 
                             className="h-16 w-16 rounded-full object-cover border-2 border-white"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
                           />
-                        ) : (
-                          <div className={`h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold ${getRandomColor(consultant)}`}>
-                            {getInitials(consultant.name)}
-                          </div>
-                        )}
+                        ) : null}
+                        <div className={`h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold ${getRandomColor(consultant)} ${(consultant.logo || consultant.avatar) ? 'hidden' : ''}`}>
+                          {getInitials(consultant.name)}
+                        </div>
                       </div>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-2">
@@ -517,17 +522,21 @@ const ConsultantsPage: React.FC = () => {
                           <tr key={consultant.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-750">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
-                                {consultant.avatar ? (
+                                {consultant.logo || consultant.avatar ? (
                                   <img 
-                                    src={consultant.avatar} 
+                                    src={getFullImageUrl(consultant.logo || consultant.avatar)} 
                                     alt={consultant.name} 
-                                    className="h-10 w-10 rounded-full"
+                                    className="h-10 w-10 rounded-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      target.nextElementSibling?.classList.remove('hidden');
+                                    }}
                                   />
-                                ) : (
-                                  <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getRandomColor(consultant)}`}>
-                                    {getInitials(consultant.name)}
-                                  </div>
-                                )}
+                                ) : null}
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getRandomColor(consultant)} ${(consultant.logo || consultant.avatar) ? 'hidden' : ''}`}>
+                                  {getInitials(consultant.name)}
+                                </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-neutral-900 dark:text-white">
                                     {consultant.name || 'N/A'}

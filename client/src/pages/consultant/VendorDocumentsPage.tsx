@@ -600,18 +600,36 @@ const VendorDocumentsPage: React.FC = () => {
   // Handle file download
   const handleDownloadFile = async (file: any) => {
     try {
-      const response = await apiService.documents.downloadFile(file._id);
+      // Use filePath if available, otherwise fall back to _id
+      const filePathOrId = file.filePath || file._id;
+      console.log('Downloading file with path/id:', filePathOrId, 'fileName:', file.fileName);
+      console.log('Full file object:', file);
+      
+      const response = await apiService.documents.downloadFile(filePathOrId, file.fileName);
+      
+      console.log('Download response headers:', response.headers);
+      console.log('Download response content-type:', response.headers['content-type']);
+      console.log('Download response size:', response.data.size || response.data.length);
+      
+      // Check if the response is actually a PDF compliance report
+      if (response.headers['content-type'] === 'application/pdf' && response.data.size > 100000) {
+        console.warn('Response appears to be a large PDF, might be a compliance report instead of the requested file');
+      }
       
       // Create blob and download
-      const blob = new Blob([response.data]);
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/octet-stream' 
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = file.fileName;
+      link.download = file.fileName || 'document';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      console.log('File download completed successfully');
     } catch (error) {
       console.error('Error downloading file:', error);
       setError('Failed to download file');

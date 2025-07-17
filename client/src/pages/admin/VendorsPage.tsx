@@ -43,8 +43,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import MainLayout from '../../components/layout/MainLayout';
 import apiService from '../../utils/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 // Mock data for vendors
 const mockVendors = [
@@ -288,7 +289,7 @@ const VendorsPage: React.FC = () => {
   }> = ({ vendor, size, className = '' }) => {
     const vendorId = vendor._id || vendor.id;
     const hasLogoError = logoErrors.has(vendorId);
-    const logoUrl = vendor.logo;
+    const logoUrl = getFullImageUrl(vendor.logo);
     
     // Size classes
     const sizeClasses = size === 'small' 
@@ -451,20 +452,20 @@ const VendorsPage: React.FC = () => {
                             <span>Last active: {vendor.lastActivity || 'N/A'}</span>
                           </div>
                           <div className="flex space-x-1">
-                            <button 
-                              className="p-1 text-blue-600 hover:bg-blue-100 rounded-full dark:hover:bg-blue-900/30"
-                              onClick={() => navigate(`/admin/vendors/${vendor._id || vendor.id}`)}
+                            <Link 
+                              to={`/admin/vendors/${vendor._id || vendor.id}`}
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded-full dark:hover:bg-blue-900/30 inline-block"
                               title="View Details"
                             >
                               <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
-                            </button>
-                            <button 
-                              className="p-1 text-amber-600 hover:bg-amber-100 rounded-full dark:hover:bg-amber-900/30"
-                              onClick={() => navigate(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
+                            </Link>
+                            <Link 
+                              to={`/admin/vendors/${vendor._id || vendor.id}/edit`}
+                              className="p-1 text-amber-600 hover:bg-amber-100 rounded-full dark:hover:bg-amber-900/30 inline-block"
                               title="Edit Vendor"
                             >
                               <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                            </button>
+                            </Link>
                             <button 
                               className="p-1 text-red-600 hover:bg-red-100 rounded-full dark:hover:bg-red-900/30"
                               onClick={() => handleDelete(vendor)}
@@ -572,20 +573,20 @@ const VendorsPage: React.FC = () => {
                               {vendor.lastActivity || 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button 
-                                className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 mr-3"
-                                onClick={() => navigate(`/admin/vendors/${vendor._id || vendor.id}`)}
+                              <Link 
+                                to={`/admin/vendors/${vendor._id || vendor.id}`}
+                                className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 mr-3 inline-block"
                                 title="View Details"
                               >
                                 <FontAwesomeIcon icon={faEye} />
-                              </button>
-                              <button 
-                                className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400 mr-3"
-                                onClick={() => navigate(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
+                              </Link>
+                              <Link 
+                                to={`/admin/vendors/${vendor._id || vendor.id}/edit`}
+                                className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400 mr-3 inline-block"
                                 title="Edit Vendor"
                               >
                                 <FontAwesomeIcon icon={faEdit} />
-                              </button>
+                              </Link>
                               <button 
                                 className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
                                 onClick={() => handleDelete(vendor)}

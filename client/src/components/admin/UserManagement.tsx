@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../../utils/api';
+import { getFullImageUrl } from '../../utils/imageUtils';
 import { 
   UserPlusIcon, 
   PencilIcon, 
@@ -175,14 +176,22 @@ const UserManagement: React.FC = () => {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
                       {user.logo ? (
-                        <img className="h-10 w-10 rounded-full object-cover" src={user.logo} alt={user.name} />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                          <span className="text-primary-600 dark:text-primary-300 font-medium text-sm">
-                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                          </span>
-                        </div>
-                      )}
+                        <img 
+                          className="h-10 w-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700" 
+                          src={getFullImageUrl(user.logo)} 
+                          alt={user.name}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center ${user.logo ? 'hidden' : ''}`}>
+                        <span className="text-primary-600 dark:text-primary-300 font-medium text-sm">
+                          {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </span>
+                      </div>
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">

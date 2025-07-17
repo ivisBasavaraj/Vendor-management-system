@@ -70,19 +70,26 @@ const VendorDetailPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
+    console.log('VendorDetailPage: useEffect triggered with id:', id);
     if (id) {
       fetchVendorDetails();
+    } else {
+      console.error('VendorDetailPage: No ID provided');
+      setError('No vendor ID provided');
+      setLoading(false);
     }
   }, [id]);
 
   const fetchVendorDetails = async () => {
     try {
+      console.log('VendorDetailPage: fetchVendorDetails called with id:', id);
       setLoading(true);
       setError(null);
       const response = await apiService.users.getById(id!);
+      console.log('VendorDetailPage: API response:', response.data);
       setVendor(response.data.data);
     } catch (error: any) {
-      console.error('Error fetching vendor details:', error);
+      console.error('VendorDetailPage: Error fetching vendor details:', error);
       setError(error?.response?.data?.message || 'Failed to fetch vendor details');
     } finally {
       setLoading(false);

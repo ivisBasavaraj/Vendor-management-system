@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import apiService from '../../utils/api';
 import MainLayout from '../../components/layout/MainLayout';
 import DocumentViewer from '../../components/documents/DocumentViewer';
 import { ArrowLeftIcon, DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import apiService from '../../utils/api';
 
 interface Document {
   _id: string;
@@ -320,8 +320,7 @@ const DocumentViewPage: React.FC = () => {
         // If not found in vendor submissions, try document-submissions endpoint
         try {
           console.log('Trying document-submissions endpoint');
-          if (!id) return;
-          const response = await apiService.documents.getSubmissionById(id as string);
+          const response = await apiService.documents.getSubmissionById(id);
           
           console.log('Submission API response:', response);
           
@@ -386,8 +385,7 @@ const DocumentViewPage: React.FC = () => {
         // Try legacy documents endpoint as a last resort
         try {
           console.log('Trying legacy documents endpoint');
-          if (!id) return;
-          const response = await apiService.documents.getById(id as string);
+          const response = await apiService.documents.getById(id);
           
           console.log('Legacy API response:', response);
           
@@ -678,12 +676,11 @@ const DocumentViewPage: React.FC = () => {
         ) : document ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              {documentUrl || (document.files && document.files[activeFileIndex]) ? (
+              {documentUrl ? (
                 <DocumentViewer 
-                  documentUrl={documentUrl || '#'}
+                  documentUrl={documentUrl}
                   fileName={document.files && document.files[activeFileIndex]?.originalName || 'Document'}
                   mimeType={document.files && document.files[activeFileIndex]?.mimeType || 'application/pdf'}
-                  filePath={document.files && document.files[activeFileIndex]?.path}
                 />
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex flex-col items-center justify-center h-64">

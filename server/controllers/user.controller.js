@@ -166,6 +166,8 @@ exports.createUser = async (req, res) => {
       taxId,
       password: providedPassword, 
       assignedConsultant,
+      assignedConsultantId,
+      assignedVendorId,
       requiresLoginApproval
     } = req.body;
 
@@ -211,8 +213,13 @@ exports.createUser = async (req, res) => {
     }
 
     // Add assigned consultant if creating a vendor
-    if (role === 'vendor' && assignedConsultant) {
-      userData.assignedConsultant = assignedConsultant;
+    if (role === 'vendor' && (assignedConsultant || assignedConsultantId)) {
+      userData.assignedConsultant = assignedConsultant || assignedConsultantId;
+    }
+    
+    // Add assigned vendor if creating a consultant
+    if (role === 'consultant' && assignedVendorId) {
+      userData.assignedVendor = assignedVendorId;
     }
 
     // Create user
@@ -267,6 +274,7 @@ exports.createUser = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   try {
+    const { getProfileImageUrl } = require('../utils/profileImageUpload');
     const { name, email, role, company, phone, address, isActive, workLocation, agreementPeriod, companyRegNo, taxId } = req.body;
 
     // If updating email, check if it's already taken
@@ -321,11 +329,20 @@ exports.updateUser = async (req, res) => {
     if (taxId) user.taxId = taxId;
     if (isActive !== undefined && req.user.role === 'admin') user.isActive = isActive;
 
+    // Handle profile image upload
+    if (req.file) {
+      user.logo = getProfileImageUrl(req.file.filename);
+    }
+
     await user.save();
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
 
     res.status(200).json({
       success: true,
-      data: user
+      data: userResponse
     });
   } catch (error) {
     console.error('Update user error:', error);
