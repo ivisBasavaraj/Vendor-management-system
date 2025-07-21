@@ -36,7 +36,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode }) => {
     logo: null as File | null,
     assignedConsultantId: '',
     assignedVendorId: '',
-    agreementPeriod: 'Annual Contract'
+    agreementPeriod: '1 April 2025 to 31 March 2026'
   });
   
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -106,7 +106,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode }) => {
           logo: null,
           assignedConsultantId: userData.assignedConsultantId || userData.consultant || '',
           assignedVendorId: userData.assignedVendorId || userData.vendor || '',
-          agreementPeriod: userData.agreementPeriod || 'Annual Contract'
+          agreementPeriod: userData.agreementPeriod || '1 April 2025 to 31 March 2026'
         });
         
         if (userData.logo) {

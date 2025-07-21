@@ -45,7 +45,7 @@ import {
 import MainLayout from '../../components/layout/MainLayout';
 import axios from 'axios';
 import apiService from '../../utils/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import { getFullImageUrl } from '../../utils/imageUtils';
 
@@ -159,6 +159,7 @@ const mockConsultants = [
 
 const ConsultantsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [consultants, setConsultants] = useState<any[]>([]);
   const [page, setPage] = useState(0);
@@ -166,6 +167,11 @@ const ConsultantsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Force component re-mount when location changes
+  useEffect(() => {
+    console.log('ConsultantsPage mounted/updated:', location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchConsultants = async () => {
@@ -186,7 +192,7 @@ const ConsultantsPage: React.FC = () => {
     };
 
     fetchConsultants();
-  }, []);
+  }, [location.pathname]); // Re-fetch when location changes
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);

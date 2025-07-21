@@ -1029,14 +1029,7 @@ exports.adminResetPassword = async (req, res) => {
       // Continue even if notification fails
     }
 
-    // Try to send email notification if email service is available
-    try {
-      const emailService = require('../utils/emailService');
-      await emailService.sendPasswordResetNotification(user, newPassword);
-    } catch (emailError) {
-      console.error('Email notification failed:', emailError);
-      // Continue even if email fails
-    }
+    // Email notification removed - old email service disabled
 
     res.status(200).json({
       success: true,

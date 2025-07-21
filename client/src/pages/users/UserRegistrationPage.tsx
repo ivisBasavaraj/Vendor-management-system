@@ -34,7 +34,7 @@ const UserRegistrationPage: React.FC = () => {
     assignedConsultantId: '',
     assignedVendorId: '',
     requiresLoginApproval: true, // Default to true for vendors
-    agreementPeriod: 'Annual Contract' // Default agreement period for vendors
+    agreementPeriod: '1 April 2025 to 31 March 2026' // Default agreement period for vendors
   });
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);

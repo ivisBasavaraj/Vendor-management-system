@@ -1255,6 +1255,8 @@ const VendorDocumentsPage: React.FC = () => {
                                 </div>
                               </div>
                               <div className="flex flex-col sm:flex-row gap-3">
+                                {/* Document Verification Report button hidden */}
+                                {false && (
                                 <Button
                                   variant="primary"
                                   size="md"
@@ -1274,6 +1276,7 @@ const VendorDocumentsPage: React.FC = () => {
                                     </>
                                   )}
                                 </Button>
+                                )}
                                 
                                 <Button
                                   variant="secondary"

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { NotificationPopupProvider } from './contexts/NotificationPopupContext';
@@ -59,6 +59,17 @@ import UserRegistrationPage from './pages/users/UserRegistrationPage';
 import VendorsPage from './pages/admin/VendorsPage';
 import VendorDetailPage from './pages/admin/VendorDetailPage';
 import VendorEditPage from './pages/admin/VendorEditPage';
+
+// Wrapper components to ensure proper re-mounting
+const VendorDetailPageWrapper: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  return <VendorDetailPage key={id} />;
+};
+
+const VendorEditPageWrapper: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  return <VendorEditPage key={id} />;
+};
 import ConsultantsPage from './pages/admin/ConsultantsPage';
 import ConsultantDetailPage from './pages/admin/ConsultantDetailPage';
 import ConsultantEditPage from './pages/admin/ConsultantEditPage';
@@ -70,6 +81,9 @@ import SettingsPage from './pages/admin/SettingsPage';
 
 // Public Pages
 import LandingPage from './pages/LandingPage';
+
+// Navigation Components
+import NavigationWrapper from './components/navigation/NavigationWrapper';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -180,8 +194,19 @@ const pageTransition: {
   duration: 0.3,
 };
 
-// Animated page wrapper
+// Animated page wrapper with location-based key for proper re-rendering
 const AnimatedPage: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  
+  // Force component re-mount when location changes
+  useEffect(() => {
+    // This effect will run whenever the location changes
+    console.log('Route changed to:', location.pathname);
+    
+    // Force a scroll to top on route change
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+  
   return (
     <motion.div
       initial="initial"
@@ -189,6 +214,7 @@ const AnimatedPage: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       exit="out"
       variants={pageVariants}
       transition={pageTransition}
+      key={`${location.pathname}-${location.search}-${Date.now()}`} // More unique key
     >
       {children}
     </motion.div>
@@ -225,8 +251,10 @@ const DashboardRouter: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
+  const location = useLocation();
+  
   return (
-    <Routes>
+    <Routes location={location} key={`${location.pathname}-${location.search}-${location.hash}`}>
       {/* Public Pages */}
       <Route path="/" element={
           <PublicRoute>
@@ -400,9 +428,11 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/vendors-list" element={
           <RoleRoute allowedRoles={['consultant', 'admin']}>
-            <AnimatedPage>
-              <VendorsListPage />
-            </AnimatedPage>
+            <NavigationWrapper>
+              <AnimatedPage>
+                <VendorsListPage key="vendors-list" />
+              </AnimatedPage>
+            </NavigationWrapper>
           </RoleRoute>
         } />
         <Route path="/vendor-documents/:vendorId" element={
@@ -466,31 +496,35 @@ const AppContent: React.FC = () => {
         {/* Admin-specific Routes */}
         <Route path="/admin/vendors" element={
           <RoleRoute allowedRoles={['admin']}>
-            <AnimatedPage>
-              <VendorsPage />
-            </AnimatedPage>
+            <NavigationWrapper>
+              <AnimatedPage>
+                <VendorsPage key="admin-vendors" />
+              </AnimatedPage>
+            </NavigationWrapper>
           </RoleRoute>
         } />
         <Route path="/admin/vendors/:id" element={
           <RoleRoute allowedRoles={['admin']}>
             <AnimatedPage>
-              <VendorDetailPage />
+              <VendorDetailPageWrapper />
             </AnimatedPage>
           </RoleRoute>
         } />
         <Route path="/admin/vendors/:id/edit" element={
           <RoleRoute allowedRoles={['admin']}>
             <AnimatedPage>
-              <VendorEditPage />
+              <VendorEditPageWrapper />
             </AnimatedPage>
           </RoleRoute>
         } />
 
         <Route path="/admin/consultants" element={
           <RoleRoute allowedRoles={['admin']}>
-            <AnimatedPage>
-              <ConsultantsPage />
-            </AnimatedPage>
+            <NavigationWrapper>
+              <AnimatedPage>
+                <ConsultantsPage key="admin-consultants" />
+              </AnimatedPage>
+            </NavigationWrapper>
           </RoleRoute>
         } />
         <Route path="/admin/consultants/:id" element={

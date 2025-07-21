@@ -174,108 +174,7 @@ class EmailService {
     }
   }
 
-  /**
-   * Send welcome email to new user (vendor or consultant) with all registration information
-   * @param {Object} user - User object (vendor or consultant)
-   * @param {string} temporaryPassword - Generated password for the user
-   * @param {Object} consultant - Assigned consultant object (for vendors only)
-   * @returns {Promise<Object>} - Result of email operation
-   */
-  async sendUserWelcomeEmail(user, temporaryPassword, consultant = null) {
-    try {
-      // First, try EmailJS
-      console.log('Attempting to send email via EmailJS...');
-      
-      // Prepare template parameters with all user information
-      // Include multiple recipient variable names to ensure compatibility
-      const templateParams = {
-        // Recipient information (multiple formats for compatibility)
-        to_email: user.email,
-        to_name: user.name,
-        email: user.email,
-        name: user.name,
-        recipient_email: user.email,
-        recipient_name: user.name,
-        
-        // User account information
-        user_name: user.name,
-        user_email: user.email,
-        user_password: temporaryPassword,
-        user_role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
-        
-        // Company information
-        company_name: user.company || 'N/A',
-        phone_number: user.phone || 'N/A',
-        address: user.address || 'N/A',
-        work_location: user.workLocation || 'N/A',
-        agreement_period: user.agreementPeriod || 'N/A',
-        company_reg_no: user.companyRegNo || 'N/A',
-        tax_id: user.taxId || 'N/A',
-        
-        // Consultant information (for vendors)
-        assigned_consultant: consultant ? consultant.name : 'N/A',
-        consultant_email: consultant ? consultant.email : 'N/A',
-        consultant_phone: consultant ? consultant.phone : 'N/A',
-        
-        // System information
-        login_url: process.env.CLIENT_URL || 'http://localhost:3000/login',
-        created_date: new Date().toLocaleDateString(),
-        subject: `Welcome to IMTMA Vendor Management System - Your ${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Account Details`,
-        
-        // Email content
-        message: `Welcome to IMTMA! Your ${user.role} account has been created successfully.`
-      };
 
-      const emailJSResult = await this.sendEmail(templateParams);
-      
-      if (emailJSResult.success) {
-        console.log('✅ Email sent successfully via EmailJS');
-        return {
-          success: true,
-          recipient: user.email,
-          userRole: user.role,
-          message: 'Welcome email sent successfully via EmailJS',
-          method: 'EmailJS'
-        };
-      } else {
-        console.log('❌ EmailJS failed, trying backup SMTP service...');
-        console.log('EmailJS Error:', emailJSResult.error);
-        
-        // If EmailJS fails, try Nodemailer as backup
-        const nodemailerResult = await nodemailerService.sendUserWelcomeEmail(user, temporaryPassword, consultant);
-        
-        if (nodemailerResult.success) {
-          console.log('✅ Email sent successfully via SMTP backup');
-          return {
-            success: true,
-            recipient: user.email,
-            userRole: user.role,
-            message: 'Welcome email sent successfully via SMTP (EmailJS backup)',
-            method: 'SMTP',
-            emailJSError: emailJSResult.error
-          };
-        } else {
-          console.log('❌ Both EmailJS and SMTP failed');
-          return {
-            success: false,
-            recipient: user.email,
-            userRole: user.role,
-            message: 'Failed to send welcome email via both EmailJS and SMTP',
-            emailJSError: emailJSResult.error,
-            smtpError: nodemailerResult.error
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Error in email sending process:', error);
-      return {
-        success: false,
-        recipient: user.email,
-        userRole: user.role,
-        error: error.message
-      };
-    }
-  }
 
   /**
    * Send welcome email to new vendor with login credentials (Legacy method - kept for backward compatibility)
@@ -519,91 +418,7 @@ class EmailService {
     }
   }
 
-  /**
-   * Send password reset notification email
-   * @param {Object} user - User object whose password was reset
-   * @param {string} newPassword - New temporary password
-   * @returns {Promise<Object>} - Result of email operation
-   */
-  async sendPasswordResetNotification(user, newPassword) {
-    try {
-      console.log('Sending password reset notification email...');
-      
-      // Create a login link for the user
-      const loginUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-      const loginLink = `${loginUrl}/login`;
-      
-      const templateParams = {
-        // Required EmailJS fields
-        to_email: user.email,
-        to_name: user.name,
-        
-        // Template-specific variables for password reset template
-        email: user.email,
-        user_password: newPassword,
-        login_url: loginLink,
-        
-        // Optional user information
-        user_name: user.name,
-        user_role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
-        company_name: user.company || 'IMTMA Vendor Management System',
-        reset_date: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
-      };
 
-      // Use the specific password reset template
-      const passwordResetTemplateId = 'template_7ngbgsh';
-      const emailResult = await this.sendEmailWithTemplate(templateParams, passwordResetTemplateId);
-      
-      if (emailResult.success) {
-        console.log('✅ Password reset notification sent successfully');
-        return {
-          success: true,
-          recipient: user.email,
-          userRole: user.role,
-          message: 'Password reset notification sent successfully',
-          method: 'EmailJS'
-        };
-      } else {
-        console.log('❌ EmailJS failed for password reset notification, trying backup SMTP...');
-        
-        // Try backup SMTP service
-        const nodemailerResult = await nodemailerService.sendPasswordResetNotification(user, newPassword);
-        
-        if (nodemailerResult && nodemailerResult.success) {
-          console.log('✅ Password reset notification sent via SMTP backup');
-          return {
-            success: true,
-            recipient: user.email,
-            userRole: user.role,
-            message: 'Password reset notification sent via SMTP backup',
-            method: 'SMTP'
-          };
-        } else {
-          console.log('❌ Both EmailJS and SMTP failed for password reset notification');
-          return {
-            success: false,
-            recipient: user.email,
-            userRole: user.role,
-            message: 'Failed to send password reset notification',
-            emailJSError: emailResult.error,
-            smtpError: nodemailerResult ? nodemailerResult.error : 'SMTP service unavailable'
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Error sending password reset notification:', error);
-      return {
-        success: false,
-        recipient: user.email,
-        userRole: user.role,
-        error: error.message
-      };
-    }
-  }
 
   /**
    * Send bulk reminder emails to vendors with pending documents
@@ -658,6 +473,459 @@ class EmailService {
         results: results
       };
     }
+  }
+
+  /**
+   * Send document submission notification to consultant
+   * @param {Object} submission - Document submission object
+   * @param {Object} vendor - Vendor who submitted the documents
+   * @param {Object} consultant - Assigned consultant
+   * @returns {Promise<Object>} - Result of email operation
+   */
+  async sendDocumentSubmissionNotification(submission, vendor, consultant) {
+    try {
+      console.log('Sending document submission notification to consultant...');
+      
+      // Format document types for email
+      const documentTypes = submission.documents.map(doc => {
+        // Convert document type to readable format
+        const readableType = doc.documentType
+          .replace(/_/g, ' ')
+          .toLowerCase()
+          .replace(/\b\w/g, l => l.toUpperCase());
+        
+        return {
+          type: readableType,
+          name: doc.documentName,
+          status: doc.status
+        };
+      });
+
+      // Create document list string for email
+      const documentList = documentTypes.map(doc => `• ${doc.type} (${doc.name})`).join('\n');
+      
+      // Format agreement period
+      const agreementPeriod = submission.agreementPeriod 
+        ? `${new Date(submission.agreementPeriod.startDate).toLocaleDateString()} - ${new Date(submission.agreementPeriod.endDate).toLocaleDateString()}`
+        : vendor.agreementPeriod || 'Annual Contract';
+
+      const templateParams = {
+        // Multiple recipient formats for EmailJS compatibility
+        to_email: consultant.email,
+        to_name: consultant.name,
+        email: consultant.email,
+        recipient_email: consultant.email,
+        recipient_name: consultant.name,
+        
+        // Consultant information
+        consultant_name: consultant.name,
+        
+        // Vendor information
+        vendor_name: vendor.name,
+        vendor_company: vendor.company || 'N/A',
+        vendor_email: vendor.email,
+        vendor_phone: vendor.phone || 'N/A',
+        
+        // Submission details
+        submission_id: submission.submissionId,
+        submission_date: new Date(submission.submissionDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        submission_time: new Date(submission.submissionDate).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        
+        // Agreement and work details
+        agreement_period: agreementPeriod,
+        work_location: submission.workLocation || vendor.workLocation || 'IMTMA, Bengaluru',
+        invoice_no: submission.invoiceNo || 'N/A',
+        
+        // Document information
+        document_count: submission.documents.length,
+        document_types: documentList,
+        document_list: documentTypes.map(doc => doc.type).join(', '),
+        
+        // Upload period
+        upload_period: `${submission.uploadPeriod.month} ${submission.uploadPeriod.year}`,
+        
+        // System URLs
+        review_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/consultant/submissions/${submission._id}`,
+        dashboard_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/consultant/dashboard`,
+        
+        // Email metadata
+        subject: `New Document Submission: ${vendor.name} - ${submission.uploadPeriod.month} ${submission.uploadPeriod.year}`,
+        email_type: 'document_submission_notification'
+      };
+
+      // Use the specific template ID for document submission notifications
+      const documentSubmissionTemplateId = 'template_ojv7u88';
+      const emailResult = await this.sendEmailWithTemplate(templateParams, documentSubmissionTemplateId);
+      
+      if (emailResult.success) {
+        console.log('✅ Document submission notification sent successfully');
+        return {
+          success: true,
+          recipient: consultant.email,
+          vendorName: vendor.name,
+          submissionId: submission.submissionId,
+          message: 'Document submission notification sent successfully',
+          method: 'EmailJS'
+        };
+      } else {
+        console.log('❌ EmailJS failed for document submission notification, trying backup SMTP...');
+        
+        // Try backup SMTP service if available
+        try {
+          const nodemailerResult = await nodemailerService.sendCustomEmail(
+            consultant.email,
+            consultant.name,
+            templateParams.subject,
+            `New document submission from ${vendor.name} (${vendor.company}) for ${submission.uploadPeriod.month} ${submission.uploadPeriod.year}.\n\nDocuments submitted:\n${documentList}\n\nPlease review at: ${templateParams.review_url}`,
+            templateParams
+          );
+          
+          if (nodemailerResult && nodemailerResult.success) {
+            console.log('✅ Document submission notification sent via SMTP backup');
+            return {
+              success: true,
+              recipient: consultant.email,
+              vendorName: vendor.name,
+              submissionId: submission.submissionId,
+              message: 'Document submission notification sent via SMTP backup',
+              method: 'SMTP'
+            };
+          }
+        } catch (smtpError) {
+          console.log('❌ SMTP backup also failed:', smtpError.message);
+        }
+        
+        console.log('❌ Both EmailJS and SMTP failed for document submission notification');
+        return {
+          success: false,
+          recipient: consultant.email,
+          vendorName: vendor.name,
+          submissionId: submission.submissionId,
+          message: 'Failed to send document submission notification',
+          emailJSError: emailResult.error,
+          method: 'Failed'
+        };
+      }
+    } catch (error) {
+      console.error('Error sending document submission notification:', error);
+      return {
+        success: false,
+        recipient: consultant ? consultant.email : 'unknown',
+        vendorName: vendor ? vendor.name : 'unknown',
+        submissionId: submission ? submission.submissionId : 'unknown',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Send document rejection notification to vendor
+   * @param {Object} document - Document object with rejection details
+   * @param {Object} vendor - Vendor object
+   * @param {Object} consultant - Consultant object who rejected the document
+   * @returns {Object} - Result object with success status and details
+   */
+  async sendDocumentRejectionNotification(document, vendor, consultant) {
+    try {
+      console.log('Sending document rejection notification to vendor...');
+      
+      // Format document type for display
+      const formatDocumentType = (type) => {
+        if (!type) return 'Document';
+        
+        const typeMap = {
+          'INVOICE': 'Invoice',
+          'FORM_T_MUSTER_ROLL': 'Form T Muster Roll',
+          'BANK_STATEMENT': 'Bank Statement',
+          'ECR': 'ECR (Employee Contribution Record)',
+          'PF_COMBINED_CHALLAN': 'PF Combined Challan',
+          'ESI_CHALLAN': 'ESI Challan',
+          'SALARY_REGISTER': 'Salary Register',
+          'ATTENDANCE_REGISTER': 'Attendance Register',
+          'COMPLIANCE_CERTIFICATE': 'Compliance Certificate',
+          'OTHER': 'Other Document'
+        };
+        
+        return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      };
+
+      // Format rejection date and time
+      const rejectionDate = new Date(document.reviewDate || Date.now());
+      const formattedDate = rejectionDate.toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const formattedTime = rejectionDate.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Generate URLs
+      const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const documentUrl = `${baseUrl}/vendor/documents`;
+      const uploadUrl = `${baseUrl}/vendor/upload`;
+      const dashboardUrl = `${baseUrl}/vendor/dashboard`;
+
+      const templateParams = {
+        // Multiple recipient formats for EmailJS compatibility
+        to_email: vendor.email,
+        to_name: vendor.name,
+        email: vendor.email,
+        recipient_email: vendor.email,
+        recipient_name: vendor.name,
+        
+        // Vendor information
+        vendor_name: vendor.name,
+        vendor_email: vendor.email,
+        vendor_company: vendor.company || vendor.companyName || 'N/A',
+        
+        // Consultant information
+        consultant_name: consultant.name,
+        consultant_email: consultant.email,
+        reviewer_name: consultant.name,
+        reviewer_email: consultant.email,
+        
+        // Document information
+        document_title: document.documentName || document.title || 'Document',
+        document_type: formatDocumentType(document.documentType),
+        document_type_raw: document.documentType,
+        document_id: document._id || document.id,
+        document_name: document.documentName || document.title || 'Document',
+        
+        // Rejection details
+        rejection_date: formattedDate,
+        rejection_time: formattedTime,
+        rejection_reason: document.reviewComments || document.comments || 'No specific reason provided',
+        review_comments: document.reviewComments || document.comments || 'No specific reason provided',
+        
+        // Status information
+        status: 'Rejected',
+        status_color: 'rejected',
+        previous_status: document.previousStatus || 'Pending Review',
+        
+        // Action URLs
+        document_url: documentUrl,
+        upload_url: uploadUrl,
+        dashboard_url: dashboardUrl,
+        resubmit_url: uploadUrl,
+        
+        // Email metadata
+        subject: `Document Rejected - ${formatDocumentType(document.documentType)} - Action Required`,
+        email_type: 'document_rejection_notification',
+        
+        // Additional context
+        submission_period: document.uploadPeriod ? `${document.uploadPeriod.month} ${document.uploadPeriod.year}` : 'N/A',
+        submission_month: document.uploadPeriod ? document.uploadPeriod.month : 'N/A',
+        submission_year: document.uploadPeriod ? document.uploadPeriod.year : 'N/A',
+        work_location: vendor.workLocation || 'IMTMA, Bengaluru',
+        
+        // Next steps
+        next_steps: 'Please review the rejection comments, make necessary corrections, and resubmit the document.',
+        
+        // Timestamps
+        sent_date: new Date().toLocaleDateString('en-IN'),
+        sent_time: new Date().toLocaleTimeString('en-IN', { hour12: true })
+      };
+
+      console.log('📤 Sending email via EmailJS Node.js SDK...');
+      console.log('📋 Service ID:', process.env.EMAILJS_SERVICE_ID);
+      console.log('📋 Template ID: template_7ngbgsh');
+      console.log('📋 Recipient:', vendor.email);
+
+      // Use specific template ID for rejection emails
+      const templateId = 'template_7ngbgsh';
+
+      const response = await emailjs.send(
+        process.env.EMAILJS_SERVICE_ID,
+        templateId,
+        templateParams,
+        {
+          publicKey: process.env.EMAILJS_PUBLIC_KEY,
+          privateKey: process.env.EMAILJS_PRIVATE_KEY,
+        }
+      );
+
+      console.log('✅ Email sent successfully via EmailJS SDK');
+      console.log('📧 Response:', response);
+
+      return {
+        success: true,
+        method: 'EmailJS',
+        recipient: vendor.email,
+        vendorName: vendor.name,
+        documentType: formatDocumentType(document.documentType),
+        consultantName: consultant.name,
+        message: 'Document rejection notification sent successfully',
+        emailJSResponse: response
+      };
+
+    } catch (emailJSError) {
+      console.log('❌ Error sending email via EmailJS SDK:', emailJSError);
+      
+      // Try SMTP backup if available
+      if (this.nodemailerService && typeof this.nodemailerService.sendCustomEmail === 'function') {
+        console.log('❌ EmailJS failed for document rejection notification, trying backup SMTP...');
+        
+        try {
+          const emailContent = this.generateDocumentRejectionEmailContent(document, vendor, consultant);
+          
+          const smtpResult = await this.nodemailerService.sendCustomEmail(
+            vendor.email,
+            `Document Rejected - ${formatDocumentType(document.documentType)} - Action Required`,
+            emailContent.text,
+            emailContent.html
+          );
+
+          if (smtpResult.success) {
+            console.log('✅ Document rejection notification sent via SMTP backup');
+            return {
+              success: true,
+              method: 'SMTP',
+              recipient: vendor.email,
+              vendorName: vendor.name,
+              documentType: formatDocumentType(document.documentType),
+              consultantName: consultant.name,
+              message: 'Document rejection notification sent via SMTP backup'
+            };
+          }
+        } catch (smtpError) {
+          console.log('❌ SMTP backup also failed:', smtpError.message);
+        }
+      }
+
+      console.log('❌ Both EmailJS and SMTP failed for document rejection notification');
+      
+      return {
+        success: false,
+        method: 'Failed',
+        recipient: vendor.email,
+        vendorName: vendor.name,
+        documentType: formatDocumentType(document.documentType),
+        consultantName: consultant.name,
+        error: 'Failed to send document rejection notification',
+        emailJSError: `EmailJS SDK error: ${emailJSError.text || emailJSError.message}`
+      };
+    }
+  }
+
+  /**
+   * Generate email content for document rejection (SMTP backup)
+   */
+  generateDocumentRejectionEmailContent(document, vendor, consultant) {
+    const formatDocumentType = (type) => {
+      const typeMap = {
+        'INVOICE': 'Invoice',
+        'FORM_T_MUSTER_ROLL': 'Form T Muster Roll',
+        'BANK_STATEMENT': 'Bank Statement',
+        'ECR': 'ECR (Employee Contribution Record)',
+        'PF_COMBINED_CHALLAN': 'PF Combined Challan',
+        'ESI_CHALLAN': 'ESI Challan',
+        'SALARY_REGISTER': 'Salary Register',
+        'ATTENDANCE_REGISTER': 'Attendance Register',
+        'COMPLIANCE_CERTIFICATE': 'Compliance Certificate',
+        'OTHER': 'Other Document'
+      };
+      return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    const documentType = formatDocumentType(document.documentType);
+    const rejectionDate = new Date(document.reviewDate || Date.now()).toLocaleDateString('en-IN');
+    const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
+    const text = `
+Document Rejection Notification - IMTMA Vendor Management System
+
+Dear ${vendor.name},
+
+Your document has been rejected and requires your attention.
+
+Document Details:
+- Document Type: ${documentType}
+- Document Name: ${document.documentName || 'N/A'}
+- Rejection Date: ${rejectionDate}
+- Reviewed By: ${consultant.name}
+
+Rejection Reason:
+${document.reviewComments || document.comments || 'No specific reason provided'}
+
+Next Steps:
+1. Review the rejection comments carefully
+2. Make necessary corrections to your document
+3. Resubmit the corrected document through the system
+
+You can access your dashboard at: ${baseUrl}/vendor/dashboard
+
+If you have any questions, please contact your assigned consultant: ${consultant.name} (${consultant.email})
+
+Best regards,
+IMTMA Vendor Management System
+    `;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #dc2626; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .rejection-box { background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 15px 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Document Rejection Notification</h2>
+            <p>IMTMA Vendor Management System</p>
+        </div>
+        <div class="content">
+            <p>Dear ${vendor.name},</p>
+            <p>Your document has been rejected and requires your attention.</p>
+            
+            <div class="rejection-box">
+                <h3>Document Details:</h3>
+                <p><strong>Document Type:</strong> ${documentType}</p>
+                <p><strong>Document Name:</strong> ${document.documentName || 'N/A'}</p>
+                <p><strong>Rejection Date:</strong> ${rejectionDate}</p>
+                <p><strong>Reviewed By:</strong> ${consultant.name}</p>
+            </div>
+            
+            <div class="rejection-box">
+                <h3>Rejection Reason:</h3>
+                <p>${document.reviewComments || document.comments || 'No specific reason provided'}</p>
+            </div>
+            
+            <p><strong>Next Steps:</strong></p>
+            <ol>
+                <li>Review the rejection comments carefully</li>
+                <li>Make necessary corrections to your document</li>
+                <li>Resubmit the corrected document through the system</li>
+            </ol>
+            
+            <p><a href="${baseUrl}/vendor/dashboard" class="button">Go to Dashboard</a></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification from IMTMA Vendor Management System.</p>
+            <p>If you have questions, contact: ${consultant.name} (${consultant.email})</p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    return { text, html };
   }
 }
 

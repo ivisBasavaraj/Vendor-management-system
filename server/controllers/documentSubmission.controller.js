@@ -8,6 +8,7 @@ const DocumentSubmission = require('../models/documentSubmission.model');
 const User = require('../models/user.model');
 const Notification = require('../models/notification.model');
 const socketService = require('../utils/socketService');
+const emailService = require('../utils/emailService');
 
 // Helper function to convert document types to uppercase format
 const convertDocumentType = (frontendType) => {
@@ -1271,6 +1272,60 @@ exports.submitForReview = async (req, res) => {
     
     // Save the updated submission
     await submission.save();
+
+    // Get vendor details with populated assigned consultant
+    const vendor = await User.findById(submission.vendor).populate('assignedConsultant', 'name email role');
+    
+    // Find the assigned consultant
+    let consultant = null;
+    
+    // Priority 1: Use the assigned consultant from vendor profile
+    if (vendor && vendor.assignedConsultant) {
+      consultant = vendor.assignedConsultant;
+      console.log(`✅ Found assigned consultant: ${consultant.name} (${consultant.email})`);
+    }
+    
+    // Priority 2: Try to find consultant by email from submission data
+    else if (submission.consultant && submission.consultant.email) {
+      consultant = await User.findOne({ 
+        email: submission.consultant.email, 
+        role: 'consultant' 
+      });
+      if (consultant) {
+        console.log(`✅ Found consultant from submission data: ${consultant.name} (${consultant.email})`);
+      }
+    }
+    
+    // Priority 3: If still no consultant, find any available consultant
+    if (!consultant) {
+      consultant = await User.findOne({ role: 'consultant', isActive: true });
+      if (consultant) {
+        console.log(`⚠️ No assigned consultant found, using available consultant: ${consultant.name} (${consultant.email})`);
+      }
+    }
+
+    // Send email notification to consultant
+    if (consultant && vendor) {
+      try {
+        console.log(`Sending document submission notification to consultant: ${consultant.email}`);
+        const emailResult = await emailService.sendDocumentSubmissionNotification(
+          submission, 
+          vendor, 
+          consultant
+        );
+        
+        if (emailResult.success) {
+          console.log('✅ Document submission notification sent successfully');
+        } else {
+          console.log('❌ Failed to send document submission notification:', emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('Error sending document submission notification:', emailError);
+        // Don't fail the submission if email fails
+      }
+    } else {
+      console.log('⚠️ No consultant or vendor found for email notification');
+    }
     
     res.status(200).json({
       success: true,
@@ -1702,6 +1757,44 @@ exports.reviewDocument = async (req, res) => {
     
     // Save the updated submission
     await submission.save();
+
+    // Send email notification for document rejection
+    if (status === 'rejected') {
+      try {
+        // Get vendor details
+        const vendor = await User.findById(submission.vendor);
+        const consultant = await User.findById(req.user.id);
+        
+        if (vendor && consultant) {
+          console.log(`📧 Sending document rejection email to vendor: ${vendor.email}`);
+          
+          // Prepare document object for email
+          const documentForEmail = {
+            ...submission.documents[documentIndex].toObject(),
+            reviewDate: Date.now(),
+            reviewComments: remarks,
+            documentType: documentType
+          };
+          
+          const emailResult = await emailService.sendDocumentRejectionNotification(
+            documentForEmail,
+            vendor,
+            consultant
+          );
+          
+          if (emailResult.success) {
+            console.log('✅ Document rejection email sent successfully');
+          } else {
+            console.log('❌ Failed to send document rejection email:', emailResult.error);
+          }
+        } else {
+          console.log('⚠️ Could not find vendor or consultant for email notification');
+        }
+      } catch (emailError) {
+        console.error('Error sending document rejection email:', emailError);
+        // Don't fail the review process if email fails
+      }
+    }
 
     // Create notification for vendor about document review
     await createDocumentReviewNotification(

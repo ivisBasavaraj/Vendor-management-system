@@ -55,7 +55,6 @@ const mockActivityLogs = [
     id: '1', 
     action: 'Document Uploaded', 
     user: 'ABC Supplies (Vendor)', 
-    documentType: 'Invoice',
     timestamp: new Date().toISOString().split('T')[0] + ' 14:30:22',
     userType: 'vendor'
   },
@@ -63,7 +62,6 @@ const mockActivityLogs = [
     id: '2', 
     action: 'Document Reviewed', 
     user: 'John Smith (Consultant)', 
-    documentType: 'Purchase Order',
     timestamp: new Date().toISOString().split('T')[0] + ' 12:45:18',
     userType: 'consultant'
   },
@@ -73,7 +71,6 @@ const mockActivityLogs = [
     id: '3', 
     action: 'Document Approved', 
     user: 'Sarah Johnson (Consultant)', 
-    documentType: 'Delivery Note',
     timestamp: '2023-06-14 16:20:05',
     userType: 'consultant'
   },
@@ -81,7 +78,6 @@ const mockActivityLogs = [
     id: '4', 
     action: 'Document Rejected', 
     user: 'Michael Brown (Consultant)', 
-    documentType: 'Quality Certificate',
     timestamp: '2023-06-14 11:10:45',
     userType: 'consultant'
   },
@@ -91,7 +87,6 @@ const mockActivityLogs = [
     id: '5', 
     action: 'Document Updated', 
     user: 'XYZ Manufacturing (Vendor)', 
-    documentType: 'Invoice',
     timestamp: '2023-06-13 09:55:30',
     userType: 'vendor'
   },
@@ -99,7 +94,6 @@ const mockActivityLogs = [
     id: '6', 
     action: 'User Login', 
     user: 'Global Logistics (Vendor)', 
-    documentType: '-',
     timestamp: '2023-06-13 08:30:12',
     userType: 'vendor'
   },
@@ -107,7 +101,6 @@ const mockActivityLogs = [
     id: '7', 
     action: 'Password Reset', 
     user: 'Tech Solutions (Vendor)', 
-    documentType: '-',
     timestamp: '2023-06-12 17:15:40',
     userType: 'vendor'
   },
@@ -115,7 +108,6 @@ const mockActivityLogs = [
     id: '8', 
     action: 'New Vendor Registered', 
     user: 'Industrial Parts', 
-    documentType: '-',
     timestamp: '2023-06-12 10:05:22',
     userType: 'vendor'
   },
@@ -125,7 +117,6 @@ const mockActivityLogs = [
     id: '9', 
     action: 'Document Downloaded', 
     user: 'Emily Davis (Consultant)', 
-    documentType: 'Compliance Certificate',
     timestamp: '2023-06-11 14:50:18',
     userType: 'consultant'
   },
@@ -133,7 +124,6 @@ const mockActivityLogs = [
     id: '10', 
     action: 'Profile Updated', 
     user: 'Robert Wilson (Consultant)', 
-    documentType: '-',
     timestamp: '2023-06-11 11:25:33',
     userType: 'consultant'
   },
@@ -143,7 +133,6 @@ const mockActivityLogs = [
     id: '11', 
     action: 'Settings Updated', 
     user: 'Admin', 
-    documentType: '-',
     timestamp: '2023-06-10 11:25:33',
     userType: 'admin'
   },
@@ -151,7 +140,6 @@ const mockActivityLogs = [
     id: '12', 
     action: 'User Account Locked', 
     user: 'Admin', 
-    documentType: '-',
     timestamp: '2023-06-10 10:15:20',
     userType: 'admin'
   },
@@ -161,7 +149,6 @@ const mockActivityLogs = [
     id: '13', 
     action: 'Comment Added', 
     user: 'ABC Supplies (Vendor)', 
-    documentType: 'Purchase Order',
     timestamp: '2023-06-09 16:40:12',
     userType: 'vendor'
   },
@@ -169,7 +156,6 @@ const mockActivityLogs = [
     id: '14', 
     action: 'Document Resubmitted', 
     user: 'XYZ Manufacturing (Vendor)', 
-    documentType: 'Quality Certificate',
     timestamp: '2023-06-09 14:22:05',
     userType: 'vendor'
   },
@@ -179,7 +165,6 @@ const mockActivityLogs = [
     id: '15', 
     action: 'Feedback Provided', 
     user: 'John Smith (Consultant)', 
-    documentType: 'Invoice',
     timestamp: '2023-06-08 11:30:45',
     userType: 'consultant'
   },
@@ -187,7 +172,6 @@ const mockActivityLogs = [
     id: '16', 
     action: 'Document Flagged', 
     user: 'Sarah Johnson (Consultant)', 
-    documentType: 'Delivery Note',
     timestamp: '2023-06-08 09:15:30',
     userType: 'consultant'
   },
@@ -197,7 +181,6 @@ const mockActivityLogs = [
     id: '17', 
     action: 'System Backup', 
     user: 'System', 
-    documentType: '-',
     timestamp: '2023-06-07 02:00:00',
     userType: 'admin'
   },
@@ -205,7 +188,6 @@ const mockActivityLogs = [
     id: '18', 
     action: 'Scheduled Maintenance', 
     user: 'System', 
-    documentType: '-',
     timestamp: '2023-06-06 01:00:00',
     userType: 'admin'
   },
@@ -215,7 +197,6 @@ const mockActivityLogs = [
     id: '19', 
     action: 'Bulk Documents Uploaded', 
     user: 'Global Logistics (Vendor)', 
-    documentType: 'Multiple',
     timestamp: '2023-06-05 15:45:22',
     userType: 'vendor'
   },
@@ -223,7 +204,6 @@ const mockActivityLogs = [
     id: '20', 
     action: 'Bulk Review Completed', 
     user: 'Michael Brown (Consultant)', 
-    documentType: 'Multiple',
     timestamp: '2023-06-05 17:30:10',
     userType: 'consultant'
   }
@@ -432,7 +412,6 @@ const ActivityLogsPage: React.FC = () => {
             id: item._id,
             action: item.action,
             user: item.userName,
-            documentType: item.documentType || '-',
             timestamp: new Date(item.createdAt).toLocaleString(),
             userType: item.userType
           }));
@@ -476,7 +455,6 @@ const ActivityLogsPage: React.FC = () => {
       'Action': log.action || '',
       'User': log.user || '',
       'User Type': log.userType || '',
-      'Document Type': log.documentType || '',
       'Timestamp': log.timestamp || ''
     }));
 
@@ -489,7 +467,6 @@ const ActivityLogsPage: React.FC = () => {
       { wch: 25 }, // Action
       { wch: 30 }, // User
       { wch: 15 }, // User Type
-      { wch: 20 }, // Document Type
       { wch: 20 }  // Timestamp
     ];
     worksheet['!cols'] = columnWidths;
@@ -532,8 +509,7 @@ const ActivityLogsPage: React.FC = () => {
     // Search term filter
     const matchesSearch = 
       ((log.action?.toLowerCase() || '').includes(searchTerm.toLowerCase())) ||
-      ((log.user?.toLowerCase() || '').includes(searchTerm.toLowerCase())) ||
-      ((log.documentType?.toLowerCase() || '').includes(searchTerm.toLowerCase()));
+      ((log.user?.toLowerCase() || '').includes(searchTerm.toLowerCase()));
     
     // User type filter
     const matchesUserType = userTypeFilter === 'all' || log.userType === userTypeFilter;
@@ -816,7 +792,6 @@ const ActivityLogsPage: React.FC = () => {
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Action</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>User</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>User Type</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151', py: 2 }}>Document Type</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -864,16 +839,11 @@ const ActivityLogsPage: React.FC = () => {
                                 }}
                               />
                             </TableCell>
-                            <TableCell sx={{ py: 2.5 }}>
-                              <Typography variant="body2" color="text.secondary">
-                                {log.documentType || '-'}
-                              </Typography>
-                            </TableCell>
                           </TableRow>
                         ))}
                       {filteredLogs.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                          <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                             <Box sx={{ textAlign: 'center' }}>
                               <Typography variant="h6" color="text.secondary" gutterBottom>
                                 No Activity Logs Found

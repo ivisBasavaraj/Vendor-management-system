@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useForceUpdate } from '../../hooks/useForceUpdate';
 import { FontAwesomeIcon } from '../../utils/icons';
 import { 
   faHome, 
@@ -33,10 +34,36 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const forceUpdate = useForceUpdate();
+
+  // Close sidebar when route changes and force update
+  useEffect(() => {
+    setSidebarOpen(false);
+    forceUpdate(); // Force component re-render
+  }, [location.pathname, forceUpdate]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleNavigation = (path: string) => {
+    // Force navigation and ensure component re-render
+    setSidebarOpen(false);
+    
+    // If we're already on the target path, force a refresh
+    if (location.pathname === path) {
+      window.location.reload();
+      return;
+    }
+    
+    // Navigate to the new path
+    navigate(path, { replace: false });
+    
+    // Force a small delay and update to ensure proper re-rendering
+    setTimeout(() => {
+      forceUpdate();
+    }, 50);
   };
 
   // Navigation items based on user role
@@ -115,10 +142,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </div>
             <nav className="px-2 mt-3 space-y-1">
               {navigationItems.map((item) => (
-                <Link
+                <button
                   key={item.name}
-                  to={item.path}
-                  className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
+                  onClick={() => handleNavigation(item.path)}
+                  className={`group flex items-center w-full px-2 py-2 text-base font-medium rounded-md text-left ${
                     location.pathname === item.path
                       ? 'bg-blue-100 text-blue-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -130,7 +157,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     {item.icon}
                   </span>
                   {item.name}
-                </Link>
+                </button>
               ))}
             </nav>
           </div>
@@ -163,10 +190,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <div className="flex flex-col flex-grow mt-3">
               <nav className="flex-1 px-2 space-y-1 bg-white">
                 {navigationItems.map((item) => (
-                  <Link
+                  <button
                     key={item.name}
-                    to={item.path}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                    onClick={() => handleNavigation(item.path)}
+                    className={`group flex items-center w-full px-2 py-2 text-sm font-medium rounded-md text-left ${
                       location.pathname === item.path
                         ? 'bg-blue-100 text-blue-900'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -178,7 +205,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                       {item.icon}
                     </span>
                     {item.name}
-                  </Link>
+                  </button>
                 ))}
               </nav>
             </div>

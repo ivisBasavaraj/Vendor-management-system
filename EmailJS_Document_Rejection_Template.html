@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Rejection Notification</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 650px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .submission-period {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .alert-box {
+            background-color: #fef2f2;
+            border-left: 4px solid #dc2626;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .alert-box h3 {
+            margin: 0 0 15px 0;
+            color: #b91c1c;
+            font-size: 18px;
+        }
+        .alert-box .status {
+            background-color: #dc2626;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .period-highlight {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .period-highlight h3 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+            font-size: 18px;
+        }
+        .period-highlight .period-text {
+            font-size: 24px;
+            font-weight: 700;
+            color: #92400e;
+            background-color: #fffbeb;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .info-card {
+            background-color: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .info-card h4 {
+            margin: 0 0 12px 0;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-card p {
+            margin: 0;
+            color: #1f2937;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .rejection-details {
+            background-color: #fef2f2;
+            border: 2px solid #fecaca;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .rejection-details h3 {
+            margin: 0 0 15px 0;
+            color: #b91c1c;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+        .rejection-details .icon {
+            background-color: #dc2626;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .rejection-reason {
+            background-color: #ffffff;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            color: #374151;
+            font-size: 16px;
+            line-height: 1.6;
+            border-left: 4px solid #dc2626;
+        }
+        .next-steps {
+            background-color: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .next-steps h3 {
+            margin: 0 0 15px 0;
+            color: #0c4a6e;
+            font-size: 18px;
+        }
+        .next-steps ol {
+            margin: 0;
+            padding-left: 20px;
+            color: #374151;
+        }
+        .next-steps li {
+            margin: 8px 0;
+            font-weight: 500;
+        }
+        .action-buttons {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            margin: 0 10px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .contact-info {
+            background-color: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .contact-info h4 {
+            margin: 0 0 10px 0;
+            color: #374151;
+        }
+        .contact-info p {
+            margin: 5px 0;
+            color: #6b7280;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 25px 30px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .footer .company {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .content {
+                padding: 20px;
+            }
+            .btn {
+                display: block;
+                margin: 10px 0;
+            }
+            .period-text {
+                font-size: 20px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>❌ Document Rejected</h1>
+            <p>IMTMA Vendor Management System</p>
+            <div class="submission-period">
+                📅 Submission Period: {{submission_month}} {{submission_year}}
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Dear {{vendor_name}},
+            </div>
+            
+            <!-- PROMINENT DISPLAY OF SUBMISSION MONTH AND YEAR -->
+            <div class="period-highlight">
+                <h3>📋 Document Submission Period</h3>
+                <div class="period-text">
+                    {{submission_month}} {{submission_year}}
+                </div>
+            </div>
+            
+            <div class="alert-box">
+                <div class="status">REJECTED</div>
+                <h3>⚠️ Action Required</h3>
+                <p>Your document for <strong>{{submission_month}} {{submission_year}}</strong> has been reviewed and <strong>rejected</strong>. Please review the feedback below and resubmit a corrected version.</p>
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h4>Document Information</h4>
+                    <p><strong>Type:</strong> {{document_type}}</p>
+                    <p><strong>Name:</strong> {{document_title}}</p>
+                    <p><strong>Status:</strong> <span style="color: #dc2626; font-weight: bold;">Rejected</span></p>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Review Details</h4>
+                    <p><strong>Reviewed By:</strong> {{consultant_name}}</p>
+                    <p><strong>Date:</strong> {{rejection_date}}</p>
+                    <p><strong>Time:</strong> {{rejection_time}}</p>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Vendor Information</h4>
+                    <p><strong>Company:</strong> {{vendor_company}}</p>
+                    <p><strong>Submission Period:</strong> {{submission_period}}</p>
+                    <p><strong>Location:</strong> {{work_location}}</p>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Submission Context</h4>
+                    <p><strong>Previous Status:</strong> {{previous_status}}</p>
+                    <p><strong>Document ID:</strong> {{document_id}}</p>
+                    <p><strong>Priority:</strong> High</p>
+                </div>
+            </div>
+            
+            <!-- REJECTION REMARKS SECTION -->
+            <div class="rejection-details">
+                <h3>
+                    <span class="icon">!</span>
+                    Rejection Reason & Comments
+                </h3>
+                <div class="rejection-reason">
+                    <strong>Consultant's Remarks:</strong><br>
+                    {{rejection_reason}}
+                </div>
+            </div>
+            
+            <div class="next-steps">
+                <h3>📋 Next Steps</h3>
+                <ol>
+                    <li>Carefully review the rejection reason and consultant's remarks above</li>
+                    <li>Make the necessary corrections to your document for <strong>{{submission_month}} {{submission_year}}</strong></li>
+                    <li>Ensure all requirements are met before resubmission</li>
+                    <li>Upload the corrected document through the system</li>
+                    <li>Submit for review again</li>
+                </ol>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="{{resubmit_url}}" class="btn btn-primary">
+                    📤 Resubmit Document for {{submission_month}} {{submission_year}}
+                </a>
+                <a href="{{dashboard_url}}" class="btn btn-secondary">
+                    📊 Go to Dashboard
+                </a>
+            </div>
+            
+            <div class="contact-info">
+                <h4>Need Help?</h4>
+                <p>If you have questions about the rejection or need clarification on the remarks for your <strong>{{submission_month}} {{submission_year}}</strong> submission, please contact your assigned consultant:</p>
+                <p><strong>{{consultant_name}}</strong></p>
+                <p>📧 {{consultant_email}}</p>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; text-align: center; margin-top: 30px;">
+                <strong>Important:</strong> Please address all the issues mentioned in the consultant's remarks before resubmitting your <strong>{{submission_month}} {{submission_year}}</strong> document. 
+                This will help ensure faster approval in the next review cycle.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p class="company">IMTMA Vendor Management System</p>
+            <p>This is an automated notification. Please do not reply to this email.</p>
+            <p>For support, contact your assigned consultant or system administrator.</p>
+            <p style="margin-top: 15px; font-size: 12px;">
+                © 2025 IMTMA. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
