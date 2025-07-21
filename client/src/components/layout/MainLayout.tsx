@@ -51,13 +51,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     // Force navigation and ensure component re-render
     setSidebarOpen(false);
     
+    console.log('MainLayout navigation from', location.pathname, 'to', path);
+    
     // If we're already on the target path, force a refresh
     if (location.pathname === path) {
       window.location.reload();
       return;
     }
     
-    // Navigate to the new path
+    // For admin list pages that have navigation issues, use window.location.href
+    // This ensures proper component re-mounting
+    if ((path.includes('/admin/vendors') && !path.includes('/admin/vendors/')) || 
+        (path.includes('/admin/consultants') && !path.includes('/admin/consultants/')) ||
+        path.includes('/vendors-list')) {
+      console.log('Using window.location.href for list page navigation');
+      window.location.href = path;
+      return;
+    }
+    
+    // For other routes, use normal navigation
     navigate(path, { replace: false });
     
     // Force a small delay and update to ensure proper re-rendering

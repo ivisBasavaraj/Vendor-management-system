@@ -11,6 +11,13 @@ const VendorsListPage: React.FC = () => {
   // Force component re-mount when location changes
   useEffect(() => {
     console.log('VendorsListPage mounted/updated:', location.pathname);
+    // Force a small delay to ensure proper mounting
+    const timer = setTimeout(() => {
+      // Trigger any necessary re-renders
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [location.pathname]);
 
   // Only consultants can access this page

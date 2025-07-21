@@ -46,6 +46,7 @@ import MainLayout from '../../components/layout/MainLayout';
 import axios from 'axios';
 import apiService from '../../utils/api';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigateWithRefresh } from '../../hooks/useNavigateWithRefresh';
 import Card from '../../components/ui/Card';
 import { getFullImageUrl } from '../../utils/imageUtils';
 
@@ -160,6 +161,7 @@ const mockConsultants = [
 const ConsultantsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const navigateWithRefresh = useNavigateWithRefresh();
   const [loading, setLoading] = useState(true);
   const [consultants, setConsultants] = useState<any[]>([]);
   const [page, setPage] = useState(0);
@@ -168,12 +170,14 @@ const ConsultantsPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Force component re-mount when location changes
+  // Reset state and re-fetch when navigating to this page
   useEffect(() => {
     console.log('ConsultantsPage mounted/updated:', location.pathname);
-  }, [location.pathname]);
-
-  useEffect(() => {
+    setLoading(true);
+    setConsultants([]);
+    setPage(0);
+    setSearchTerm('');
+    
     const fetchConsultants = async () => {
       try {
         setLoading(true);
@@ -443,7 +447,7 @@ const ConsultantsPage: React.FC = () => {
                                 const consultantId = consultant.id || consultant._id;
                                 console.log('Navigating to consultant:', consultantId, consultant);
                                 if (consultantId) {
-                                  navigate(`/admin/consultants/${consultantId}`);
+                                  navigateWithRefresh(`/admin/consultants/${consultantId}`);
                                 } else {
                                   alert('Consultant ID not found');
                                 }
@@ -457,7 +461,7 @@ const ConsultantsPage: React.FC = () => {
                                 const consultantId = consultant.id || consultant._id;
                                 console.log('Navigating to edit consultant:', consultantId, consultant);
                                 if (consultantId) {
-                                  navigate(`/admin/consultants/${consultantId}/edit`);
+                                  navigateWithRefresh(`/admin/consultants/${consultantId}/edit`);
                                 } else {
                                   alert('Consultant ID not found');
                                 }
@@ -584,7 +588,7 @@ const ConsultantsPage: React.FC = () => {
                                 onClick={() => {
                                   const consultantId = consultant.id || consultant._id;
                                   if (consultantId) {
-                                    navigate(`/admin/consultants/${consultantId}`);
+                                    navigateWithRefresh(`/admin/consultants/${consultantId}`);
                                   } else {
                                     alert('Consultant ID not found');
                                   }
@@ -597,7 +601,7 @@ const ConsultantsPage: React.FC = () => {
                                 onClick={() => {
                                   const consultantId = consultant.id || consultant._id;
                                   if (consultantId) {
-                                    navigate(`/admin/consultants/${consultantId}/edit`);
+                                    navigateWithRefresh(`/admin/consultants/${consultantId}/edit`);
                                   } else {
                                     alert('Consultant ID not found');
                                   }

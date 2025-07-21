@@ -43,7 +43,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import MainLayout from '../../components/layout/MainLayout';
 import apiService from '../../utils/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigateWithRefresh } from '../../hooks/useNavigateWithRefresh';
 import Card from '../../components/ui/Card';
 import { getFullImageUrl } from '../../utils/imageUtils';
 
@@ -149,6 +150,8 @@ const mockVendors = [
 
 const VendorsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigateWithRefresh = useNavigateWithRefresh();
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<any[]>([]);
   const [page, setPage] = useState(0);
@@ -158,9 +161,15 @@ const VendorsPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
 
+  // Reset state when navigating to this page
   useEffect(() => {
+    console.log('VendorsPage mounted/updated:', location.pathname);
+    setLoading(true);
+    setVendors([]);
+    setPage(0);
+    setSearchTerm('');
     fetchVendors();
-  }, []);
+  }, [location.pathname]);
 
   const fetchVendors = async () => {
     try {
@@ -453,22 +462,22 @@ const VendorsPage: React.FC = () => {
                           </div>
                           <div className="flex space-x-1">
                             {(vendor._id || vendor.id) && (
-                              <Link 
-                                to={`/admin/vendors/${vendor._id || vendor.id}`}
+                              <button 
+                                onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}`)}
                                 className="p-1 text-blue-600 hover:bg-blue-100 rounded-full dark:hover:bg-blue-900/30 inline-block"
                                 title="View Details"
                               >
                                 <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
-                              </Link>
+                              </button>
                             )}
                             {(vendor._id || vendor.id) && (
-                              <Link 
-                                to={`/admin/vendors/${vendor._id || vendor.id}/edit`}
+                              <button 
+                                onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
                                 className="p-1 text-amber-600 hover:bg-amber-100 rounded-full dark:hover:bg-amber-900/30 inline-block"
                                 title="Edit Vendor"
                               >
                                 <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                              </Link>
+                              </button>
                             )}
                             <button 
                               className="p-1 text-red-600 hover:bg-red-100 rounded-full dark:hover:bg-red-900/30"
@@ -578,22 +587,22 @@ const VendorsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               {(vendor._id || vendor.id) && (
-                                <Link 
-                                  to={`/admin/vendors/${vendor._id || vendor.id}`}
+                                <button 
+                                  onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}`)}
                                   className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 mr-3 inline-block"
                                   title="View Details"
                                 >
                                   <FontAwesomeIcon icon={faEye} />
-                                </Link>
+                                </button>
                               )}
                               {(vendor._id || vendor.id) && (
-                                <Link 
-                                  to={`/admin/vendors/${vendor._id || vendor.id}/edit`}
+                                <button 
+                                  onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
                                   className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400 mr-3 inline-block"
                                   title="Edit Vendor"
                                 >
                                   <FontAwesomeIcon icon={faEdit} />
-                                </Link>
+                                </button>
                               )}
                               <button 
                                 className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
