@@ -86,7 +86,7 @@ exports.login = async (req, res) => {
     if (user.role === 'vendor' && user.requiresLoginApproval && !user.firstLoginCompleted) {
       // Import the login approval controller and socket service
       const loginApprovalController = require('./loginApproval.controller');
-      const socketService = require('../utils/socketService');
+      const webSocketService = require('../utils/webSocketService');
       const LoginApproval = require('../models/loginApproval.model');
       
       // This logic is no longer needed since we only require approval for first login
@@ -100,7 +100,7 @@ exports.login = async (req, res) => {
       );
       
       // Send real-time notification via WebSocket
-      socketService.sendLoginApprovalRequest(loginApproval, user);
+      webSocketService.sendLoginApprovalRequest(loginApproval, user);
       
       // Return response without token - login pending approval
       return res.status(200).json({
@@ -199,8 +199,8 @@ exports.forgotPassword = async (req, res) => {
     }
 
     // Send real-time notification to admins via WebSocket
-    const socketService = require('../utils/socketService');
-    socketService.sendPasswordResetNotification(user);
+    const webSocketService = require('../utils/webSocketService');
+    webSocketService.sendPasswordResetNotification(user);
 
     res.status(200).json({
       success: true,

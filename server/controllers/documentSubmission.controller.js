@@ -7,7 +7,7 @@ const multer = require('multer');
 const DocumentSubmission = require('../models/documentSubmission.model');
 const User = require('../models/user.model');
 const Notification = require('../models/notification.model');
-const socketService = require('../utils/socketService');
+const webSocketService = require('../utils/webSocketService');
 const emailService = require('../utils/emailService');
 
 // Helper function to convert document types to uppercase format
@@ -803,12 +803,20 @@ exports.getVendorStatus = async (req, res) => {
       });
     }
 
-    // Find the vendor
+    // Find the vendor and check if active
     const vendor = await User.findById(vendorId);
     if (!vendor) {
       return res.status(404).json({
         success: false,
         message: 'Vendor not found'
+      });
+    }
+
+    // Check if vendor is active
+    if (vendor.isActive === false) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found or inactive'
       });
     }
 
@@ -996,20 +1004,45 @@ exports.getAllSubmissions = async (req, res) => {
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get submissions with pagination
-    const submissions = await DocumentSubmission.find(query)
+    // Get submissions with pagination, excluding submissions from deactivated users
+    const allSubmissions = await DocumentSubmission.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .populate('vendor', 'name email company')
+      .populate({
+        path: 'vendor',
+        select: 'name email company isActive',
+        match: { isActive: { $ne: false } } // Only include active vendors
+      })
       .populate('consultant', 'name email')
       .populate('consultantApproval.approvedBy', 'name email')
       .populate('finalApproval.approvedBy', 'name email')
       .populate('documents.reviewedBy', 'name email')
       .populate('uploadedBy.id', 'name email role');
 
-    // Get total count
-    const total = await DocumentSubmission.countDocuments(query);
+    // Filter out submissions where vendor is null (deactivated users)
+    const submissions = allSubmissions.filter(submission => submission.vendor !== null);
+
+    // Get total count of submissions from active vendors only
+    const activeVendorSubmissions = await DocumentSubmission.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'vendor',
+          foreignField: '_id',
+          as: 'vendorInfo'
+        }
+      },
+      {
+        $match: {
+          'vendorInfo.isActive': { $ne: false }
+        }
+      },
+      { $count: 'total' }
+    ]);
+    
+    const total = activeVendorSubmissions.length > 0 ? activeVendorSubmissions[0].total : 0;
 
     res.status(200).json({
       success: true,
@@ -1890,7 +1923,7 @@ exports.finalApproval = async (req, res) => {
     });
 
     // Send real-time notification to vendor
-    socketService.sendToUser(submission.vendor.toString(), 'notification', {
+    webSocketService.sendToUser(submission.vendor.toString(), 'notification', {
       type: 'notification',
       data: {
         ...vendorNotification.toObject(),
@@ -2927,7 +2960,7 @@ const createDocumentUploadNotification = async (submission, documentType, action
     });
 
     // Send real-time notification to consultant
-    socketService.sendToUser(consultant._id.toString(), 'notification', {
+    webSocketService.sendToUser(consultant._id.toString(), 'notification', {
       type: 'notification',
       data: {
         ...consultantNotification.toObject(),
@@ -2972,7 +3005,7 @@ const createDocumentReviewNotification = async (submission, documentType, action
     });
 
     // Send real-time notification to vendor
-    socketService.sendToUser(vendorId.toString(), 'notification', {
+    webSocketService.sendToUser(vendorId.toString(), 'notification', {
       type: 'notification',
       data: {
         ...vendorNotification.toObject(),
@@ -3019,7 +3052,7 @@ const createCompletionNotification = async (submission, consultantId, notificati
       });
 
       // Send real-time notification to admin
-      socketService.sendToUser(admin._id.toString(), 'notification', {
+      webSocketService.sendToUser(admin._id.toString(), 'notification', {
         type: 'notification',
         data: {
           ...adminNotification.toObject(),
@@ -3256,7 +3289,7 @@ exports.consultantUploadDocument = async (req, res) => {
         });
 
         // Send real-time notification to vendor
-        socketService.sendToUser(vendorId.toString(), 'notification', {
+        webSocketService.sendToUser(vendorId.toString(), 'notification', {
           type: 'document_upload',
           data: {
             title: 'Documents Uploaded and Approved on Your Behalf',
@@ -3286,7 +3319,7 @@ exports.consultantUploadDocument = async (req, res) => {
           });
 
           // Send real-time notification to admin
-          socketService.sendToUser(admin._id.toString(), 'notification', {
+          webSocketService.sendToUser(admin._id.toString(), 'notification', {
             type: 'document_submission',
             data: {
               title: 'Documents Ready for Final Approval',

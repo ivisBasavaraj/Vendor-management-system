@@ -805,6 +805,38 @@ const apiService = {
     send: (messageData: any) => // Added send method for messages
       api.post(`${API_PREFIX}/messages`, messageData),
   },
+  
+  // Activity Log endpoints
+  activityLogs: {
+    getAll: (params?: any) =>
+      api.get(`${API_PREFIX}/activity-logs`, { params }),
+    
+    getStats: () =>
+      api.get(`${API_PREFIX}/activity-logs/stats`),
+    
+    getUserLogs: (userId: string, params?: any) =>
+      api.get(`${API_PREFIX}/activity-logs/users/${userId}`, { params }),
+    
+    getVendorLogs: (vendorId?: string, params?: any) =>
+      vendorId 
+        ? api.get(`${API_PREFIX}/activity-logs/vendors/${vendorId}`, { params })
+        : api.get(`${API_PREFIX}/activity-logs/vendors`, { params }),
+    
+    getConsultantLogs: (consultantId?: string, params?: any) =>
+      consultantId 
+        ? api.get(`${API_PREFIX}/activity-logs/consultants/${consultantId}`, { params })
+        : api.get(`${API_PREFIX}/activity-logs/consultants`, { params }),
+    
+    getDocumentLogs: (documentId: string) =>
+      api.get(`${API_PREFIX}/activity-logs/documents/${documentId}`),
+    
+    manualLog: (logData: any) =>
+      api.post(`${API_PREFIX}/activity-logs/log`, logData),
+    
+    createTestData: () =>
+      api.post(`${API_PREFIX}/activity-logs/test-data`),
+  },
 };
 
+export { apiService };
 export default apiService;

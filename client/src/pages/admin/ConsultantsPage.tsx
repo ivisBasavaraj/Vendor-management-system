@@ -27,7 +27,6 @@ import { FontAwesomeIcon } from '../../utils/icons';
 import { 
   faSearch, 
   faEye, 
-  faEdit, 
   faTrash,
   faFilter,
   faPlus,
@@ -455,20 +454,7 @@ const ConsultantsPage: React.FC = () => {
                             >
                               <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
                             </button>
-                            <button 
-                              className="p-1 text-amber-600 hover:bg-amber-100 rounded-full dark:hover:bg-amber-900/30"
-                              onClick={() => {
-                                const consultantId = consultant.id || consultant._id;
-                                console.log('Navigating to edit consultant:', consultantId, consultant);
-                                if (consultantId) {
-                                  navigateWithRefresh(`/admin/consultants/${consultantId}/edit`);
-                                } else {
-                                  alert('Consultant ID not found');
-                                }
-                              }}
-                            >
-                              <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                            </button>
+
                             <button 
                               className="p-1 text-red-600 hover:bg-red-100 rounded-full dark:hover:bg-red-900/30"
                               onClick={() => {
@@ -596,19 +582,7 @@ const ConsultantsPage: React.FC = () => {
                               >
                                 <FontAwesomeIcon icon={faEye} />
                               </button>
-                              <button 
-                                className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400 mr-3"
-                                onClick={() => {
-                                  const consultantId = consultant.id || consultant._id;
-                                  if (consultantId) {
-                                    navigateWithRefresh(`/admin/consultants/${consultantId}/edit`);
-                                  } else {
-                                    alert('Consultant ID not found');
-                                  }
-                                }}
-                              >
-                                <FontAwesomeIcon icon={faEdit} />
-                              </button>
+
                               <button 
                                 className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
                                 onClick={() => {

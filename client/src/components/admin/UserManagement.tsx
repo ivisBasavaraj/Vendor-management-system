@@ -211,7 +211,6 @@ const UserManagement: React.FC = () => {
                   <Badge
                     variant={
                       user.role === 'admin' ? 'primary' :
-                      user.role === 'imtma' ? 'info' :
                       user.role === 'consultant' ? 'success' :
                       user.role === 'vendor' ? 'warning' : 'default'
                     }
@@ -280,7 +279,6 @@ const UserManagement: React.FC = () => {
             <TabsTrigger value="all">All Users</TabsTrigger>
             <TabsTrigger value="vendor">Vendors</TabsTrigger>
             <TabsTrigger value="consultant">Consultants</TabsTrigger>
-            <TabsTrigger value="imtma">IMTMA</TabsTrigger>
             <TabsTrigger value="admin">Admins</TabsTrigger>
           </TabsList>
           

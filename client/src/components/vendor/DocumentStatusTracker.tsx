@@ -861,12 +861,7 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
                     File Information
                   </label>
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      📄 Document file has been uploaded and is stored in the system.
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                      File Name: {selectedDocumentForView.filePath.split('/').pop() || 'Unknown'}
-                    </p>
+                   
                     <p className="text-xs text-blue-600 dark:text-blue-400 italic mt-1">
                       Note: Direct file viewing is not available in this version.
                     </p>

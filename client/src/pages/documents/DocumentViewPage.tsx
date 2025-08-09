@@ -76,11 +76,8 @@ const DocumentViewPage: React.FC = () => {
         
         console.log('Fetching document with ID:', id);
         
-        // Document viewing is disabled due to backend limitations
-        console.log('DocumentViewPage: Document viewing is disabled due to backend limitations');
-        setError('Document viewing is not available at this time. The file viewing service is not configured on the server.');
-        setLoading(false);
-        return;
+        // Document viewing is now enabled - backend supports file viewing
+        console.log('DocumentViewPage: Document viewing is enabled');
         
         // First, try to get the document from the vendor submissions endpoint
         // This is the most likely place for vendor documents
@@ -460,8 +457,10 @@ const DocumentViewPage: React.FC = () => {
         try {
           // Try to load the document directly using its ID
           console.log(`Making API request to view file with ID: ${filePath}`);
-          console.log('DocumentViewPage: File viewing is disabled due to backend limitations');
-          throw new Error('Document viewing is disabled');
+          const fileUrl = `/api/documents/view?filePath=${encodeURIComponent(filePath)}`;
+          console.log('Constructed file URL:', fileUrl);
+          setDocumentUrl(fileUrl);
+          return;
         } catch (idError: any) {
           console.error('Failed to load document using ID:', idError);
           console.error('Error details:', {
@@ -483,8 +482,10 @@ const DocumentViewPage: React.FC = () => {
         
         try {
           // Try to load the file using just the filename
-          console.log('DocumentViewPage: File viewing is disabled due to backend limitations');
-          throw new Error('Document viewing is disabled');
+          const fileUrl = `/api/documents/view?filePath=${encodeURIComponent(fileName)}`;
+          console.log('Constructed file URL for Windows path:', fileUrl);
+          setDocumentUrl(fileUrl);
+          return;
         } catch (windowsPathError: any) {
           console.error('Failed to load document using extracted filename:', windowsPathError.message || windowsPathError);
           // Continue with other methods if filename loading fails
@@ -544,8 +545,19 @@ const DocumentViewPage: React.FC = () => {
       for (const pathToTry of pathsToTry) {
         try {
           console.log('Trying path:', pathToTry);
-          console.log('DocumentViewPage: File viewing is disabled due to backend limitations');
-          throw new Error('Document viewing is disabled');
+          const fileUrl = `/api/documents/view?filePath=${encodeURIComponent(pathToTry)}`;
+          console.log('Constructed file URL:', fileUrl);
+          
+          // Test if the URL is accessible by making a HEAD request
+          const response = await fetch(fileUrl, { method: 'HEAD' });
+          if (response.ok) {
+            console.log('Successfully found file at:', pathToTry);
+            setDocumentUrl(fileUrl);
+            loaded = true;
+            break;
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
         } catch (pathError: any) {
           console.log(`Failed to load with path ${pathToTry}:`, pathError.message || pathError);
           lastError = pathError;
@@ -557,8 +569,18 @@ const DocumentViewPage: React.FC = () => {
         try {
           console.log('All paths failed, trying document ID directly:', id);
           console.log(`Making API request to view file with ID: ${id}`);
-          console.log('DocumentViewPage: File viewing is disabled due to backend limitations');
-          throw new Error('Document viewing is disabled');
+          const fileUrl = `/api/documents/view?filePath=${encodeURIComponent(id)}`;
+          console.log('Constructed file URL for document ID:', fileUrl);
+          
+          // Test if the URL is accessible
+          const response = await fetch(fileUrl, { method: 'HEAD' });
+          if (response.ok) {
+            console.log('Successfully found file using document ID');
+            setDocumentUrl(fileUrl);
+            loaded = true;
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
         } catch (idError: any) {
           console.error('Failed to load document using ID:', idError);
           console.error('Error details:', {

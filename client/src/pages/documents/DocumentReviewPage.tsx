@@ -117,7 +117,7 @@ const DocumentReviewPage: React.FC = () => {
   }}>({});
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<'individual' | 'bulk'>('individual');
-  const [downloadingAll, setDownloadingAll] = useState(false);
+
 
   // Fetch document data
   useEffect(() => {
@@ -280,40 +280,7 @@ const DocumentReviewPage: React.FC = () => {
     }
   };
   
-  // Download all files as zip
-  const handleDownloadAll = async () => {
-    try {
-      if (!document?._id) {
-        setError('No document selected for download');
-        return;
-      }
 
-      setDownloadingAll(true);
-      setError('');
-
-      // Make API call to download files as zip
-      const response = await apiService.documents.downloadAllFiles(document._id);
-
-      // Get the document object safely
-      const doc = getSafeDocument();
-
-      // Create a blob URL for the downloaded file
-      const url = URL.createObjectURL(response.data);
-      
-      // Create and trigger download
-      const link = doc.createElement('a');
-      link.href = url;
-      link.download = `${document?.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.zip`;
-      (doc.body as HTMLElement).appendChild(link);
-      link.click();
-      (doc.body as HTMLElement).removeChild(link);
-    } catch (err: any) {
-      setError('Failed to download files. Please try again.');
-      console.error('Error downloading files:', err);
-    } finally {
-      setDownloadingAll(false);
-    }
-  };
 
   // Handle file download
   const handleDownload = async (filePath: string, fileName?: string) => {
@@ -323,25 +290,35 @@ const DocumentReviewPage: React.FC = () => {
         return;
       }
 
+      console.log('Downloading file:', { filePath, fileName });
+
+      // Use the API service to download the file
+      const response = await apiService.documents.downloadFile(filePath, fileName || 'document');
+      
+      // Create blob from response
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/octet-stream' 
+      });
+      
       // Get the document object safely
       const doc = getSafeDocument();
       
-      // If the file path is a URL, use it directly
-      // Otherwise, construct the full URL using the API base URL
-      const fileUrl = filePath.startsWith('http') 
-        ? filePath 
-        : `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/${filePath.replace(/^\//, '')}`;
-      
-      // Create a temporary anchor element
+      // Create download URL and trigger download
+      const url = window.URL.createObjectURL(blob);
       const link = doc.createElement('a');
-      link.href = fileUrl;
+      link.href = url;
       link.download = fileName || 'document';
       (doc.body as HTMLElement).appendChild(link);
       link.click();
       (doc.body as HTMLElement).removeChild(link);
-    } catch (error) {
+      
+      // Clean up the URL object
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error: any) {
       console.error('Error downloading file:', error);
-      setError('Failed to download file. Please try again.');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to download file. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -400,22 +377,7 @@ const DocumentReviewPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-800">Document Review</h1>
           </div>
           
-          {/* Download All Button */}
-          {document && document.files && document.files.length > 0 && (
-            <button
-              type="button"
-              onClick={handleDownloadAll}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              disabled={downloadingAll || loading}
-            >
-              {downloadingAll ? (
-                <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
-              ) : (
-                <FontAwesomeIcon icon={faDownload} className="mr-2" />
-              )}
-              Download All Files
-            </button>
-          )}
+
         </div>
 
         {error && (
@@ -436,41 +398,7 @@ const DocumentReviewPage: React.FC = () => {
           </div>
         )}
 
-        {/* Review Mode Toggle */}
-        {document && document.files && document.files.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between bg-white rounded-lg shadow p-4">
-              <div>
-                <h2 className="text-lg font-medium text-gray-800">Review Mode</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Choose how you want to review this document submission
-                </p>
-              </div>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setReviewMode('individual')}
-                  className={`px-4 py-2 mr-2 rounded-md text-sm font-medium ${reviewMode === 'individual' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                >
-                  <FontAwesomeIcon icon={faClipboardList} className="mr-2" />
-                  Individual Files
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReviewMode('bulk')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${reviewMode === 'bulk' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                >
-                  <FontAwesomeIcon icon={faClipboardCheck} className="mr-2" />
-                  Bulk Review
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
         
         {/* Document Content */}
         {loading ? (
@@ -478,99 +406,99 @@ const DocumentReviewPage: React.FC = () => {
             <FontAwesomeIcon icon={faSpinner} className="text-blue-500 text-4xl animate-spin" />
           </div>
         ) : document ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {/* Document Details */}
-            <div className="lg:col-span-2">
+            <div>
               <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="border-b border-gray-200 px-6 py-4">
                   <h2 className="text-lg font-medium text-gray-800">Document Details</h2>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Title</h3>
-                      <p className="mt-1 text-sm text-gray-900">{document.title}</p>
+                      <p className="text-sm text-gray-900 break-words">{document.title}</p>
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Type</h3>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <p className="text-sm text-gray-900 break-words">
                         {document.documentType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </p>
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Submission Date</h3>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <p className="text-sm text-gray-900 break-words">
                         {new Date(document.submissionDate).toLocaleDateString()}
                       </p>
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Current Status</h3>
-                      <p className="mt-1 text-sm">
+                      <div>
                         {document.status === 'approved' ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                             <FontAwesomeIcon icon={faCheckCircle} className="mr-1 mt-0.5" />
                             Approved
                           </span>
                         ) : document.status === 'rejected' ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
                             <FontAwesomeIcon icon={faTimesCircle} className="mr-1 mt-0.5" />
                             Rejected
                           </span>
                         ) : document.status === 'under_review' ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                             <FontAwesomeIcon icon={faSpinner} className="mr-1 mt-0.5 animate-spin" />
                             Under Review
                           </span>
                         ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                             <FontAwesomeIcon icon={faExclamationCircle} className="mr-1 mt-0.5" />
                             Pending
                           </span>
                         )}
-                      </p>
+                      </div>
                     </div>
                     {document.expiryDate && (
-                      <div>
+                      <div className="space-y-2">
                         <h3 className="text-sm font-medium text-gray-500">Expiry Date</h3>
-                        <p className="mt-1 text-sm text-gray-900">
+                        <p className="text-sm text-gray-900 break-words">
                           {new Date(document.expiryDate).toLocaleDateString()}
                         </p>
                       </div>
                     )}
-                    <div>
+                    <div className="space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Current Stage</h3>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <p className="text-sm text-gray-900 break-words">
                         {getCurrentStage()}
                       </p>
                     </div>
                   </div>
 
                   {document.description && (
-                    <div className="mt-6">
+                    <div className="mt-6 space-y-2">
                       <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                      <p className="mt-1 text-sm text-gray-900">{document.description}</p>
+                      <p className="text-sm text-gray-900 break-words leading-relaxed">{document.description}</p>
                     </div>
                   )}
 
                   {/* Vendor Information */}
                   <div className="mt-6 p-4 border border-gray-200 rounded-md bg-gray-50">
-                    <h3 className="text-sm font-medium text-gray-700">Vendor Information</h3>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-4">Vendor Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-1">
                         <h4 className="text-xs font-medium text-gray-500">Name</h4>
-                        <p className="text-sm text-gray-900">{document.vendor.name}</p>
+                        <p className="text-sm text-gray-900 break-words">{document.vendor.name}</p>
                       </div>
-                      <div>
+                      <div className="space-y-1">
                         <h4 className="text-xs font-medium text-gray-500">Company</h4>
-                        <p className="text-sm text-gray-900">{document.vendor.company}</p>
+                        <p className="text-sm text-gray-900 break-words">{document.vendor.company}</p>
                       </div>
-                      <div>
+                      <div className="space-y-1">
                         <h4 className="text-xs font-medium text-gray-500">Email</h4>
-                        <p className="text-sm text-gray-900">{document.vendor.email}</p>
+                        <p className="text-sm text-gray-900 break-words">{document.vendor.email}</p>
                       </div>
-                      <div>
+                      <div className="space-y-1">
                         <h4 className="text-xs font-medium text-gray-500">Phone</h4>
-                        <p className="text-sm text-gray-900">{document.vendor.phone || 'N/A'}</p>
+                        <p className="text-sm text-gray-900 break-words">{document.vendor.phone || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -586,39 +514,47 @@ const DocumentReviewPage: React.FC = () => {
                   {document.files && document.files.length > 0 ? (
                     <div className="space-y-4">
                       {document.files.map((file, index) => (
-                        <div key={index} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
-                          <div className="flex items-center">
-                            {getFileIcon(file.mimeType)}
-                            <div className="ml-3">
-                              <p className="text-sm font-medium text-gray-800">{file.originalName}</p>
-                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 mt-0.5">
+                              {getFileIcon(file.mimeType)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 break-words">{file.originalName}</p>
+                              <p className="text-xs text-gray-500 mt-1">{formatFileSize(file.size)}</p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <button
+                                onClick={() => handleDownload(file.path, file.originalName)}
+                                className="text-blue-600 hover:text-blue-800 flex items-center px-3 py-1 rounded-md hover:bg-blue-50 transition-colors whitespace-nowrap"
+                              >
+                                <FontAwesomeIcon icon={faDownload} className="h-4 w-4 mr-1" />
+                                <span>Download</span>
+                              </button>
                             </div>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : document.fileUrl ? (
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <FontAwesomeIcon icon={faFile} className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 break-words">{document.fileName}</p>
+                        </div>
+                        <div className="flex-shrink-0">
                           <button
-                            onClick={() => handleDownload(file.path, file.originalName)}
-                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                            onClick={() => handleDownload(document.fileUrl!, document.fileName!)}
+                            className="text-blue-600 hover:text-blue-800 flex items-center px-3 py-1 rounded-md hover:bg-blue-50 transition-colors whitespace-nowrap"
                           >
                             <FontAwesomeIcon icon={faDownload} className="h-4 w-4 mr-1" />
                             <span>Download</span>
                           </button>
                         </div>
-                      ))}
-                    </div>
-                  ) : document.fileUrl ? (
-                    <div className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faFile} className="h-5 w-5 text-gray-400" />
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-800">{document.fileName}</p>
-                        </div>
                       </div>
-                      <button
-                        onClick={() => handleDownload(document.fileUrl!, document.fileName!)}
-                        className="text-blue-600 hover:text-blue-800 flex items-center"
-                      >
-                        <FontAwesomeIcon icon={faDownload} className="h-4 w-4 mr-1" />
-                        <span>Download</span>
-                      </button>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">No files available</p>
@@ -694,149 +630,7 @@ const DocumentReviewPage: React.FC = () => {
               )}
             </div>
 
-            {/* Review Form */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="border-b border-gray-200 px-6 py-4">
-                  <h2 className="text-lg font-medium text-gray-800">Submit Review</h2>
-                </div>
-                <div className="p-6">
-                  <form onSubmit={handleReviewSubmit}>
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Review Status <span className="text-red-500">*</span>
-                      </label>
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <input
-                            id="status-under-review"
-                            name="status"
-                            type="radio"
-                            value="under_review"
-                            checked={reviewStatus === 'under_review'}
-                            onChange={() => setReviewStatus('under_review')}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                            disabled={submitting}
-                          />
-                          <label
-                            htmlFor="status-under-review"
-                            className="ml-3 block text-sm font-medium text-gray-700"
-                          >
-                            Under Review
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            id="status-approved"
-                            name="status"
-                            type="radio"
-                            value="approved"
-                            checked={reviewStatus === 'approved'}
-                            onChange={() => setReviewStatus('approved')}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                            disabled={submitting}
-                          />
-                          <label
-                            htmlFor="status-approved"
-                            className="ml-3 block text-sm font-medium text-gray-700"
-                          >
-                            Approve Document
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            id="status-rejected"
-                            name="status"
-                            type="radio"
-                            value="rejected"
-                            checked={reviewStatus === 'rejected'}
-                            onChange={() => setReviewStatus('rejected')}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                            disabled={submitting}
-                          />
-                          <label
-                            htmlFor="status-rejected"
-                            className="ml-3 block text-sm font-medium text-gray-700"
-                          >
-                            Reject Document
-                          </label>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="mb-6">
-                      <label htmlFor="reviewNotes" className="block text-sm font-medium text-gray-700 mb-1">
-                        Review Notes <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        id="reviewNotes"
-                        rows={5}
-                        className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        placeholder={
-                          reviewStatus === 'rejected'
-                            ? 'Provide detailed feedback on why the document is being rejected and what changes are needed'
-                            : 'Provide comments about the document approval (required)'
-                        }
-                        value={reviewNotes}
-                        onChange={(e) => setReviewNotes(e.target.value)}
-                        disabled={submitting}
-                        required
-                      ></textarea>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Remarks are mandatory for both approval and rejection. The vendor will receive this feedback.
-                      </p>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => navigate('/documents')}
-                        className="mr-3 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        disabled={submitting}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                          reviewStatus === 'approved'
-                            ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
-                            : reviewStatus === 'rejected'
-                            ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                            : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                        } focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                          submitting ? 'opacity-70 cursor-not-allowed' : ''
-                        }`}
-                        disabled={submitting}
-                      >
-                        {submitting ? (
-                          <>
-                            <FontAwesomeIcon icon={faSpinner} className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                            Submitting...
-                          </>
-                        ) : (
-                          <>
-                            {reviewStatus === 'approved' ? (
-                              <>
-                                <FontAwesomeIcon icon={faCheckCircle} className="-ml-1 mr-2 h-4 w-4" />
-                                Approve
-                              </>
-                            ) : reviewStatus === 'rejected' ? (
-                              <>
-                                <FontAwesomeIcon icon={faTimesCircle} className="-ml-1 mr-2 h-4 w-4" />
-                                Reject
-                              </>
-                            ) : (
-                              'Save Review'
-                            )}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-6 text-center">

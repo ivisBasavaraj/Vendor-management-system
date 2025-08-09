@@ -220,8 +220,8 @@ exports.approveLoginRequest = async (req, res) => {
     }
     
     // Send real-time notification via WebSocket
-    const socketService = require('../utils/socketService');
-    socketService.sendLoginApprovalUpdate(vendor._id.toString(), 'approved', req.user);
+    const webSocketService = require('../utils/webSocketService');
+    webSocketService.sendLoginApprovalUpdate(vendor._id.toString(), 'approved', req.user);
 
     // Create in-app notification for the vendor with high priority
     await Notification.create({
@@ -295,8 +295,8 @@ exports.rejectLoginRequest = async (req, res) => {
     const vendor = await User.findById(loginApproval.vendor);
     
     // Send real-time notification via WebSocket
-    const socketService = require('../utils/socketService');
-    socketService.sendLoginApprovalUpdate(vendor._id.toString(), 'rejected', req.user);
+    const webSocketService = require('../utils/webSocketService');
+    webSocketService.sendLoginApprovalUpdate(vendor._id.toString(), 'rejected', req.user);
 
     // Create in-app notification for the vendor with high priority
     await Notification.create({

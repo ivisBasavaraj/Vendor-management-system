@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 interface LoginApprovalNotification {
   id: string;
@@ -43,16 +44,19 @@ const WebSocketContext = createContext<WebSocketContextType>({
 });
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [loginApprovalNotifications, setLoginApprovalNotifications] = useState<LoginApprovalNotification[]>([]);
   const [documentNotifications, setDocumentNotifications] = useState<DocumentNotification[]>([]);
 
   useEffect(() => {
+    if (!user) return;
+
     // Get WebSocket URL from environment or use a secure fallback for production
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsBaseUrl = process.env.REACT_APP_API_BASE_URL || 'https://vendor-management-system-api.herokuapp.com';
-    const wsUrl = wsBaseUrl.replace(/^https?:/, wsProtocol);
+    const wsBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+    const wsUrl = wsBaseUrl.replace(/^https?:/, wsProtocol) + '/ws';
     
     console.log('Connecting to WebSocket at:', wsUrl);
     const ws = new WebSocket(wsUrl);
@@ -61,26 +65,46 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log('WebSocket connection established');
       setIsConnected(true);
       setSocket(ws);
+      
+      // Send authentication message
+      ws.send(JSON.stringify({
+        type: 'authenticate',
+        userId: user.id,
+        role: user.role
+      }));
     };
 
     ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'login_approval') {
-        addLoginApprovalNotification(message.data);
-      } else if (message.type === 'notification') {
-        addDocumentNotification(message.data);
+      try {
+        const message = JSON.parse(event.data);
+        console.log('Received WebSocket message:', message);
+        
+        if (message.type === 'login_approval') {
+          addLoginApprovalNotification(message.data);
+        } else if (message.type === 'notification') {
+          addDocumentNotification(message.data);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
     };
 
     ws.onclose = () => {
+      console.log('WebSocket connection closed');
       setIsConnected(false);
       setSocket(null);
     };
 
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setIsConnected(false);
+    };
+
     return () => {
+      console.log('Cleaning up WebSocket connection');
       ws.close();
     };
-  }, []);
+  }, [user]);
 
   const addLoginApprovalNotification = (notification: LoginApprovalNotification) => {
     setLoginApprovalNotifications((prev) => [...prev, notification]);
@@ -99,13 +123,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const sendLoginApprovalNotification = (notification: any) => {
-  if (socket && isConnected) {
-    socket.send(JSON.stringify({
-      type: 'login_approval',
-      data: notification
-    }));
-  }
-};
+    if (socket && isConnected) {
+      socket.send(JSON.stringify({
+        type: 'login_approval_notification',
+        data: notification
+      }));
+    }
+  };
 
 return (
     <WebSocketContext.Provider

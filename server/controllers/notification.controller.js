@@ -1,5 +1,6 @@
 const Notification = require('../models/notification.model');
 const User = require('../models/user.model');
+const webSocketService = require('../utils/webSocketService');
 
 // Get notifications for the current user
 exports.getMyNotifications = async (req, res) => {
@@ -157,6 +158,8 @@ exports.createNotification = async (req, res) => {
     });
   }
 };
+
+
 
 // Delete notification
 exports.deleteNotification = async (req, res) => {

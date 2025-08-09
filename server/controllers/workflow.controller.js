@@ -5,7 +5,7 @@ const User = require('../models/user.model');
 const Notification = require('../models/notification.model');
 const ApprovalReport = require('../models/approvalReport.model');
 const MISReport = require('../models/misReport.model');
-const socketService = require('../utils/socketService');
+const webSocketService = require('../utils/webSocketService');
 
 // Create a new vendor submission with multiple documents
 exports.createVendorSubmission = async (req, res) => {
@@ -624,7 +624,7 @@ exports.createReviewNotifications = async (submission, document, consultantId, a
   });
 
   // Send real-time notification to vendor
-  socketService.sendToUser(submission.vendor._id.toString(), 'notification', {
+  webSocketService.sendToUser(submission.vendor._id.toString(), 'notification', {
     type: 'notification',
     data: {
       ...vendorNotification.toObject(),
@@ -650,7 +650,7 @@ exports.createReviewNotifications = async (submission, document, consultantId, a
     });
 
     // Send real-time notification to admin
-    socketService.sendToUser(admin._id.toString(), 'notification', {
+    webSocketService.sendToUser(admin._id.toString(), 'notification', {
       type: 'notification',
       data: {
         ...adminNotification.toObject(),
@@ -681,7 +681,7 @@ exports.createCrossVerificationNotifications = async (submission, document, veri
   });
 
   // Send real-time notification to vendor
-  socketService.sendToUser(submission.vendor._id.toString(), 'notification', {
+  webSocketService.sendToUser(submission.vendor._id.toString(), 'notification', {
     type: 'notification',
     data: {
       ...vendorNotification.toObject(),
@@ -711,7 +711,7 @@ exports.createFinalApprovalNotifications = async (submission, documentApprovals,
   });
 
   // Send real-time notification to vendor
-  socketService.sendToUser(submission.vendor._id.toString(), 'notification', {
+  webSocketService.sendToUser(submission.vendor._id.toString(), 'notification', {
     type: 'notification',
     data: {
       ...vendorNotification.toObject(),

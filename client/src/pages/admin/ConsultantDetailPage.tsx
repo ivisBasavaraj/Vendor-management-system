@@ -5,7 +5,19 @@ import {
   CircularProgress,
   Chip,
   Alert,
-  Divider
+  Divider,
+  Avatar,
+  Box,
+  Typography,
+  Grid,
+  Paper,
+  IconButton,
+  Tooltip,
+  Badge,
+  Card as MuiCard,
+  CardContent,
+  CardHeader,
+  LinearProgress
 } from '@mui/material';
 import { FontAwesomeIcon } from '../../utils/icons';
 import { 
@@ -25,7 +37,19 @@ import {
   faCalendarAlt,
   faCheckCircle,
   faTimesCircle,
-  faExclamationCircle
+  faExclamationCircle,
+  faStar,
+  faAward,
+  faChartLine,
+  faUsers,
+  faClock,
+  faEye,
+  faDownload,
+  faShare,
+  faShieldAlt,
+  faCertificate,
+  faHistory,
+  faUserCheck
 } from '@fortawesome/free-solid-svg-icons';
 import MainLayout from '../../components/layout/MainLayout';
 import Card from '../../components/ui/Card';
@@ -260,18 +284,7 @@ const ConsultantDetailPage: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <FontAwesomeIcon icon={faCheckCircle} className="text-green-500" />;
-      case 'inactive':
-        return <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />;
-      case 'pending':
-        return <FontAwesomeIcon icon={faExclamationCircle} className="text-amber-500" />;
-      default:
-        return null;
-    }
-  };
+  
 
   const getInitials = (name: string) => {
     if (!name) return 'NA';
@@ -333,338 +346,289 @@ const ConsultantDetailPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 space-y-4 lg:space-y-0">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="outlined"
-              startIcon={<FontAwesomeIcon icon={faArrowLeft} />}
-              onClick={() => navigate('/admin/consultants')}
-              className="shrink-0"
-            >
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
-                Consultant Details
-              </h1>
-              <p className="text-neutral-600 dark:text-neutral-400 mt-1">
-                View and manage consultant information
-              </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-900">
+        {/* Compact Header */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-10">
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FontAwesomeIcon icon={faArrowLeft} />}
+                  onClick={() => navigate('/admin/consultants')}
+                  className="!text-xs !py-1 !px-2"
+                >
+                  Back
+                </Button>
+                <div>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    Consultant Profile
+                  </h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Professional details and activity overview
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FontAwesomeIcon icon={faEdit} />}
+                  onClick={() => navigate(`/users/edit/${id}`)}
+                  className="!bg-gradient-to-r !from-blue-500 !to-indigo-500 !text-white !text-xs !py-1 !px-3"
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  startIcon={deleting ? <CircularProgress size={12} /> : <FontAwesomeIcon icon={faTrash} />}
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="!text-xs !py-1 !px-3"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className="flex space-x-3">
-            <Button
-              variant="outlined"
-              startIcon={<FontAwesomeIcon icon={faEdit} />}
-              onClick={() => navigate(`/admin/consultants/${id}/edit`)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={deleting ? <CircularProgress size={16} /> : <FontAwesomeIcon icon={faTrash} />}
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
           </div>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <Alert severity="error" className="mb-4" onClose={() => setError(null)}>
-            {error}
-          </Alert>
+          <div className="px-4 pt-3">
+            <Alert severity="error" className="!text-sm" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Profile Card */}
-          <div className="lg:col-span-1">
-            <Card className="text-center">
-              <div className="p-6">
-                <div className="mb-4">
-                  {consultant.logo ? (
-                    <img 
-                      src={getFullImageUrl(consultant.logo)} 
-                      alt={consultant.name} 
-                      className="h-24 w-24 rounded-full mx-auto object-cover"
-                      onError={(e) => {
-                        console.error('Failed to load consultant logo:', consultant.logo);
-                        // Hide the image and show initials instead
-                        e.currentTarget.style.display = 'none';
-                        const initialsDiv = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (initialsDiv) {
-                          initialsDiv.style.display = 'flex';
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <div 
-                    className={`h-24 w-24 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto ${getRandomColor(consultant)}`}
-                    style={{ display: consultant.logo ? 'none' : 'flex' }}
-                  >
-                    {getInitials(consultant.name || '')}
-                  </div>
-                </div>
-                
-                <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
-                  {consultant.name || 'Unknown Consultant'}
-                </h2>
-                
-                <div className="flex items-center justify-center mb-4">
-                  {getStatusIcon(consultant.status || 'pending')}
-                  <Chip 
-                    label={(consultant.status || 'pending').charAt(0).toUpperCase() + (consultant.status || 'pending').slice(1)}
-                    color={getStatusColor(consultant.status || 'pending') as any}
-                    size="small"
-                    className="ml-2"
-                  />
-                </div>
-
-                <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  <div className="flex items-center justify-center">
-                    <FontAwesomeIcon icon={faUserTie} className="w-4 h-4 mr-2" />
-                    <span>{consultant.role || 'Not specified'}</span>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <FontAwesomeIcon icon={faBuilding} className="w-4 h-4 mr-2" />
-                    <span>{consultant.department || 'Not specified'}</span>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <FontAwesomeIcon icon={faFileAlt} className="w-4 h-4 mr-2" />
-                    <span>{consultant.documentsReviewed || 0} Documents Reviewed</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Details Cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Contact Information */}
-            <Card>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Contact Information
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faEnvelope} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Email</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.email || 'Not provided'}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faPhone} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Phone</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.phone || 'Not provided'}</p>
-                    </div>
-                  </div>
-
-                  {consultant.website && (
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faGlobe} className="text-neutral-500 mr-3" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Website</p>
-                        <a 
-                          href={consultant.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                        >
-                          {consultant.website}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {consultant.address && (
-                    <div className="flex items-start">
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-neutral-500 mr-3 mt-1" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Address</p>
-                        <p className="text-neutral-900 dark:text-white">{consultant.address}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {/* Professional Information */}
-            <Card>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Professional Information
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faBriefcase} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Role</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.role || 'Not specified'}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faBuilding} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Department</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.department || 'Not specified'}</p>
-                    </div>
-                  </div>
-
-                  {consultant.registrationNumber && (
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faIdCard} className="text-neutral-500 mr-3" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Registration Number</p>
-                        <p className="text-neutral-900 dark:text-white">{consultant.registrationNumber}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {consultant.taxId && (
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faIdCard} className="text-neutral-500 mr-3" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Tax ID</p>
-                        <p className="text-neutral-900 dark:text-white">{consultant.taxId}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {/* Activity Information */}
-            <Card>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
-                  Activity Information
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faFileAlt} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Documents Reviewed</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.documentsReviewed || 0}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faCalendarAlt} className="text-neutral-500 mr-3" />
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">Last Activity</p>
-                      <p className="text-neutral-900 dark:text-white">{consultant.lastActivity || 'Never'}</p>
-                    </div>
-                  </div>
-
-                  {consultant.createdAt && (
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faCalendarAlt} className="text-neutral-500 mr-3" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Joined</p>
-                        <p className="text-neutral-900 dark:text-white">
-                          {new Date(consultant.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {consultant.updatedAt && (
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faCalendarAlt} className="text-neutral-500 mr-3" />
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Last Updated</p>
-                        <p className="text-neutral-900 dark:text-white">
-                          {new Date(consultant.updatedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {/* Assigned Vendors */}
-            <Card>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-                    Assigned Vendors ({assignedVendors.length})
-                  </h3>
-                  {vendorsLoading && <CircularProgress size={20} />}
-                </div>
-                
-                {assignedVendors.length > 0 ? (
-                  <div className="space-y-3">
-                    {assignedVendors.map((vendor) => (
+        {/* Main Content - Optimized for no scrolling */}
+        <div className="px-4 py-4">
+          <div className="grid grid-cols-12 gap-4 max-w-7xl mx-auto">
+            
+            {/* Profile Section - Compact */}
+            <div className="col-span-12 lg:col-span-4">
+              <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 dark:border-gray-700/20 overflow-hidden">
+                {/* Profile Header with Gradient */}
+                <div className="bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4 text-white relative overflow-hidden">
+                  <div className="absolute inset-0 bg-black/10"></div>
+                  <div className="relative z-10 text-center">
+                    <div className="mb-3">
+                      {consultant.logo ? (
+                        <img 
+                          src={getFullImageUrl(consultant.logo)} 
+                          alt={consultant.name} 
+                          className="h-16 w-16 rounded-full mx-auto object-cover border-3 border-white/30"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const initialsDiv = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (initialsDiv) {
+                              initialsDiv.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
                       <div 
-                        key={vendor._id} 
-                        className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                        className="h-16 w-16 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm text-white text-lg font-bold mx-auto border-2 border-white/30"
+                        style={{ display: consultant.logo ? 'none' : 'flex' }}
                       >
-                        <div className="flex items-center space-x-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                            {vendor.name ? vendor.name.charAt(0).toUpperCase() : 'V'}
-                          </div>
-                          <div>
-                            <p className="font-medium text-neutral-900 dark:text-white">
-                              {vendor.name || 'Unknown Vendor'}
-                            </p>
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                              {vendor.email}
-                            </p>
-                            {vendor.company && (
-                              <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                                {vendor.company}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {vendor.status && (
-                            <Chip 
-                              label={vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1)}
-                              color={getStatusColor(vendor.status)}
-                              size="small"
-                            />
-                          )}
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => navigate(`/admin/vendors/${vendor._id}`)}
-                            startIcon={<FontAwesomeIcon icon={faUser} />}
-                          >
-                            View
-                          </Button>
+                        {getInitials(consultant.name || '')}
+                      </div>
+                    </div>
+                    
+                    <h2 className="text-lg font-bold mb-1">
+                      {consultant.name || 'Unknown Consultant'}
+                    </h2>
+                    
+                    <div className="flex items-center justify-center mb-2">
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        consultant.status === 'active' ? 'bg-green-500/20 text-green-100' :
+                        consultant.status === 'inactive' ? 'bg-red-500/20 text-red-100' :
+                        'bg-yellow-500/20 text-yellow-100'
+                      }`}>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-white/80">
+                      <div className="flex items-center justify-center mb-1">
+                        <FontAwesomeIcon icon={faUserTie} className="w-3 h-3 mr-2" />
+                        <span>{consultant.role || 'Not specified'}</span>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <FontAwesomeIcon icon={faBuilding} className="w-3 h-3 mr-2" />
+                        <span>{consultant.department || 'Not specified'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Information Grid - Compact */}
+            <div className="col-span-12 lg:col-span-8">
+              <div className="grid grid-cols-1 gap-4 h-full">
+                
+                {/* Contact & Professional Info Combined */}
+                <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 dark:border-gray-700/20 p-4">
+                  <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-3 flex items-center">
+                    <FontAwesomeIcon icon={faUser} className="w-4 h-4 mr-2 text-blue-500" />
+                    Contact & Professional Information
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center text-sm">
+                        <FontAwesomeIcon icon={faEnvelope} className="text-gray-400 mr-3 w-4" />
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Email</div>
+                          <div className="text-gray-900 dark:text-white font-medium">{consultant.email || 'Not provided'}</div>
                         </div>
                       </div>
-                    ))}
+                      
+                      <div className="flex items-center text-sm">
+                        <FontAwesomeIcon icon={faPhone} className="text-gray-400 mr-3 w-4" />
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Phone</div>
+                          <div className="text-gray-900 dark:text-white font-medium">{consultant.phone || 'Not provided'}</div>
+                        </div>
+                      </div>
+
+                      {consultant.website && (
+                        <div className="flex items-center text-sm">
+                          <FontAwesomeIcon icon={faGlobe} className="text-gray-400 mr-3 w-4" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Website</div>
+                            <a 
+                              href={consultant.website} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium"
+                            >
+                              {consultant.website}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {consultant.address && (
+                        <div className="flex items-start text-sm">
+                          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400 mr-3 w-4 mt-1" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Address</div>
+                            <div className="text-gray-900 dark:text-white font-medium">{consultant.address}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {consultant.registrationNumber && (
+                        <div className="flex items-center text-sm">
+                          <FontAwesomeIcon icon={faIdCard} className="text-gray-400 mr-3 w-4" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Registration</div>
+                            <div className="text-gray-900 dark:text-white font-medium">{consultant.registrationNumber}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {consultant.taxId && (
+                        <div className="flex items-center text-sm">
+                          <FontAwesomeIcon icon={faIdCard} className="text-gray-400 mr-3 w-4" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Tax ID</div>
+                            <div className="text-gray-900 dark:text-white font-medium">{consultant.taxId}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center text-sm">
+                        <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-400 mr-3 w-4" />
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Last Activity</div>
+                          <div className="text-gray-900 dark:text-white font-medium">{consultant.lastActivity || 'Never'}</div>
+                        </div>
+                      </div>
+
+                      {consultant.createdAt && (
+                        <div className="flex items-center text-sm">
+                          <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-400 mr-3 w-4" />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Joined</div>
+                            <div className="text-gray-900 dark:text-white font-medium">
+                              {new Date(consultant.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FontAwesomeIcon 
-                      icon={faUser} 
-                      className="text-4xl text-neutral-300 dark:text-neutral-600 mb-3" 
-                    />
-                    <p className="text-neutral-500 dark:text-neutral-400">
-                      No vendors assigned to this consultant
-                    </p>
+                </div>
+
+                {/* Assigned Vendors - Compact */}
+                <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 dark:border-gray-700/20 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-white flex items-center">
+                      <FontAwesomeIcon icon={faUsers} className="w-4 h-4 mr-2 text-purple-500" />
+                      Assigned Vendors ({assignedVendors.length})
+                    </h3>
+                    {vendorsLoading && <CircularProgress size={16} />}
                   </div>
-                )}
+                  
+                  {assignedVendors.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                      {assignedVendors.map((vendor) => (
+                        <div 
+                          key={vendor._id} 
+                          className="flex items-center justify-between p-2 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-lg hover:from-blue-50 hover:to-indigo-50 dark:hover:from-gray-600 dark:hover:to-blue-800/30 transition-all duration-200 cursor-pointer"
+                          onClick={() => navigate(`/admin/vendors/${vendor._id}`)}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                              {vendor.name ? vendor.name.charAt(0).toUpperCase() : 'V'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {vendor.name || 'Unknown Vendor'}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {vendor.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            {vendor.status && (
+                              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                vendor.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                vendor.status === 'inactive' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              }`}>
+                                {vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1)}
+                              </div>
+                            )}
+                            <FontAwesomeIcon icon={faEye} className="w-3 h-3 text-gray-400" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <FontAwesomeIcon 
+                        icon={faUsers} 
+                        className="text-3xl text-gray-300 dark:text-gray-600 mb-2" 
+                      />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No vendors assigned to this consultant
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
@@ -673,12 +637,4 @@ const ConsultantDetailPage: React.FC = () => {
 };
 
 export default ConsultantDetailPage;
-
-
-
-
-
-
-
-
 

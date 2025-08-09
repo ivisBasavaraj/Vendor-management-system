@@ -95,16 +95,42 @@ router.get('/', protect, async (req, res) => {
     if (vendorId) query.vendorId = new ObjectId(vendorId);
     if (auditorId) query.auditorId = new ObjectId(auditorId);
 
-    // Get compliance reports with pagination
+    // Get compliance reports with pagination, excluding deactivated vendors
     const skip = (page - 1) * limit;
-    const reports = await ComplianceReport.find(query)
-      .populate('vendorId', 'name email company address workLocation')
+    const allReports = await ComplianceReport.find(query)
+      .populate({
+        path: 'vendorId',
+        select: 'name email company address workLocation isActive',
+        match: { isActive: { $ne: false } }
+      })
       .populate('auditorId', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    const totalReports = await ComplianceReport.countDocuments(query);
+    // Filter out reports where vendor is null (deactivated users)
+    const reports = allReports.filter(report => report.vendorId !== null);
+
+    // Get total count of reports from active vendors only
+    const activeVendorReports = await ComplianceReport.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'vendorId',
+          foreignField: '_id',
+          as: 'vendorInfo'
+        }
+      },
+      {
+        $match: {
+          'vendorInfo.isActive': { $ne: false }
+        }
+      },
+      { $count: 'total' }
+    ]);
+    
+    const totalReports = activeVendorReports.length > 0 ? activeVendorReports[0].total : 0;
 
     res.json({
       success: true,

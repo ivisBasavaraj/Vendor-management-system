@@ -27,7 +27,6 @@ import { FontAwesomeIcon } from '../../utils/icons';
 import { 
   faSearch, 
   faEye, 
-  faEdit, 
   faTrash,
   faFilter,
   faPlus,
@@ -470,15 +469,7 @@ const VendorsPage: React.FC = () => {
                                 <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
                               </button>
                             )}
-                            {(vendor._id || vendor.id) && (
-                              <button 
-                                onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
-                                className="p-1 text-amber-600 hover:bg-amber-100 rounded-full dark:hover:bg-amber-900/30 inline-block"
-                                title="Edit Vendor"
-                              >
-                                <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-                              </button>
-                            )}
+
                             <button 
                               className="p-1 text-red-600 hover:bg-red-100 rounded-full dark:hover:bg-red-900/30"
                               onClick={() => handleDelete(vendor)}
@@ -595,15 +586,7 @@ const VendorsPage: React.FC = () => {
                                   <FontAwesomeIcon icon={faEye} />
                                 </button>
                               )}
-                              {(vendor._id || vendor.id) && (
-                                <button 
-                                  onClick={() => navigateWithRefresh(`/admin/vendors/${vendor._id || vendor.id}/edit`)}
-                                  className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400 mr-3 inline-block"
-                                  title="Edit Vendor"
-                                >
-                                  <FontAwesomeIcon icon={faEdit} />
-                                </button>
-                              )}
+
                               <button 
                                 className="text-red-600 hover:text-red-900 dark:hover:text-red-400"
                                 onClick={() => handleDelete(vendor)}

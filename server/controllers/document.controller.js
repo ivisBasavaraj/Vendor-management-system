@@ -1094,15 +1094,41 @@ exports.getDocuments = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
-    const total = await DocModel.countDocuments(query);
+    // Get total count of documents from active vendors only
+    const activeVendorDocuments = await DocModel.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'vendor',
+          foreignField: '_id',
+          as: 'vendorInfo'
+        }
+      },
+      {
+        $match: {
+          'vendorInfo.isActive': { $ne: false }
+        }
+      },
+      { $count: 'total' }
+    ]);
+    
+    const total = activeVendorDocuments.length > 0 ? activeVendorDocuments[0].total : 0;
 
-    // Get documents with vendor and reviewer info
-    const documents = await DocModel.find(query)
-      .populate('vendor', 'name email company')
+    // Get documents with vendor and reviewer info, excluding deactivated vendors
+    const allDocuments = await DocModel.find(query)
+      .populate({
+        path: 'vendor',
+        select: 'name email company isActive',
+        match: { isActive: { $ne: false } }
+      })
       .populate('reviewer', 'name email')
       .sort({ createdAt: -1 })
       .skip(startIndex)
       .limit(limit);
+
+    // Filter out documents where vendor is null (deactivated users)
+    const documents = allDocuments.filter(doc => doc.vendor !== null);
 
     // Pagination result
     const pagination = {};
@@ -1764,6 +1790,12 @@ exports.getDocumentsGroupedByVendor = async (req, res) => {
       // Unwind the vendor details array
       {
         $unwind: '$vendorDetails'
+      },
+      // Filter out deactivated vendors
+      {
+        $match: {
+          'vendorDetails.isActive': { $ne: false }
+        }
       },
       // Project to reshape the data
       {

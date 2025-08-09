@@ -1195,7 +1195,7 @@ const VendorDocumentsPage: React.FC = () => {
                                 </div>
                                 
                                 <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-800">
-                                  <div className="flex flex-wrap gap-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <Button
                                       variant="outline"
                                       size="md"
@@ -1203,7 +1203,7 @@ const VendorDocumentsPage: React.FC = () => {
                                         setSelectedDocument(document);
                                         setShowDocumentModal(true);
                                       }}
-                                      className="flex items-center px-4 py-2 text-base font-medium"
+                                      className="flex items-center justify-center px-4 py-2 text-base font-medium w-full"
                                     >
                                       <EyeIcon className="h-5 w-5 mr-2" />
                                       View Details
@@ -1214,7 +1214,7 @@ const VendorDocumentsPage: React.FC = () => {
                                         variant="success"
                                         size="md"
                                         onClick={() => handleApproveDocument(document)}
-                                        className="flex items-center px-4 py-2 text-base font-medium"
+                                        className="flex items-center justify-center px-4 py-2 text-base font-medium w-full"
                                       >
                                         <CheckCircleIcon className="h-5 w-5 mr-2" />
                                         Approve
@@ -1226,7 +1226,7 @@ const VendorDocumentsPage: React.FC = () => {
                                         variant="danger"
                                         size="md"
                                         onClick={() => handleRejectDocument(document)}
-                                        className="flex items-center px-4 py-2 text-base font-medium"
+                                        className="flex items-center justify-center px-4 py-2 text-base font-medium w-full"
                                       >
                                         <XCircleIcon className="h-5 w-5 mr-2" />
                                         Reject
@@ -1335,56 +1335,58 @@ const VendorDocumentsPage: React.FC = () => {
             isOpen={showDocumentModal}
             onClose={() => setShowDocumentModal(false)}
             title="Document Details"
-            size="lg"
+            size="xl"
           >
             {selectedDocument && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Document Title
                     </label>
-                    <p className="text-gray-900 dark:text-white">{selectedDocument.title}</p>
+                    <p className="text-gray-900 dark:text-white break-words">{selectedDocument.title}</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Document Type
                     </label>
-                    <p className="text-gray-900 dark:text-white">{selectedDocument.documentType}</p>
+                    <p className="text-gray-900 dark:text-white break-words">{selectedDocument.documentType}</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Submission Date
                     </label>
-                    <p className="text-gray-900 dark:text-white">
+                    <p className="text-gray-900 dark:text-white break-words">
                       {format(parseISO(selectedDocument.submissionDate), 'PPp')}
                     </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Status
                     </label>
-                    <Badge 
-                      variant={
-                        selectedDocument.status === 'approved' ? 'success' :
-                        selectedDocument.status === 'rejected' ? 'danger' :
-                        selectedDocument.status === 'under_review' ? 'warning' :
-                        selectedDocument.status === 'resubmitted' ? 'info' :
-                        'default'
-                      }
-                    >
-                      {selectedDocument.status.charAt(0).toUpperCase() + selectedDocument.status.slice(1).replace('_', ' ')}
-                    </Badge>
+                    <div>
+                      <Badge 
+                        variant={
+                          selectedDocument.status === 'approved' ? 'success' :
+                          selectedDocument.status === 'rejected' ? 'danger' :
+                          selectedDocument.status === 'under_review' ? 'warning' :
+                          selectedDocument.status === 'resubmitted' ? 'info' :
+                          'default'
+                        }
+                      >
+                        {selectedDocument.status.charAt(0).toUpperCase() + selectedDocument.status.slice(1).replace('_', ' ')}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
                 {selectedDocument.reviewNotes && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Review Notes
                     </label>
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                      <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                      <p className="text-gray-900 dark:text-white whitespace-pre-wrap break-words leading-relaxed">
                         {selectedDocument.reviewNotes}
                       </p>
                     </div>
@@ -1395,29 +1397,31 @@ const VendorDocumentsPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                     Files ({selectedDocument.fileCount})
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {selectedDocument.files?.map((file, index) => (
-                      <div key={file._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="flex items-center">
-                          <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-3" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <div key={file._id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <DocumentTextIcon className="h-5 w-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white break-words">
                               {file.fileName}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
                               {file.fileType} • Uploaded {format(parseISO(file.uploadDate), 'PPp')}
                             </p>
                           </div>
+                          <div className="flex-shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadFile(file)}
+                              className="flex items-center whitespace-nowrap"
+                            >
+                              <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadFile(file)}
-                          className="flex items-center"
-                        >
-                          <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                          Download
-                        </Button>
                       </div>
                     ))}
                   </div>

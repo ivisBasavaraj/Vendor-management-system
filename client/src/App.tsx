@@ -58,7 +58,8 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import UserRegistrationPage from './pages/users/UserRegistrationPage';
 import VendorsPage from './pages/admin/VendorsPage';
 import VendorDetailPage from './pages/admin/VendorDetailPage';
-import VendorEditPage from './pages/admin/VendorEditPage';
+import NotificationManagementPage from './pages/admin/NotificationManagementPage';
+
 
 // Wrapper components to ensure proper re-mounting
 const VendorDetailPageWrapper: React.FC = () => {
@@ -66,13 +67,10 @@ const VendorDetailPageWrapper: React.FC = () => {
   return <VendorDetailPage key={id} />;
 };
 
-const VendorEditPageWrapper: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  return <VendorEditPage key={id} />;
-};
+
 import ConsultantsPage from './pages/admin/ConsultantsPage';
 import ConsultantDetailPage from './pages/admin/ConsultantDetailPage';
-import ConsultantEditPage from './pages/admin/ConsultantEditPage';
+
 import ActivityLogsPage from './pages/admin/ActivityLogsPage';
 import StatusPage from './pages/admin/StatusPage';
 import DownloadsPage from './pages/admin/DownloadsPage';
@@ -510,13 +508,7 @@ const AppContent: React.FC = () => {
             </AnimatedPage>
           </RoleRoute>
         } />
-        <Route path="/admin/vendors/:id/edit" element={
-          <RoleRoute allowedRoles={['admin']}>
-            <AnimatedPage>
-              <VendorEditPageWrapper />
-            </AnimatedPage>
-          </RoleRoute>
-        } />
+
 
         <Route path="/admin/consultants" element={
           <RoleRoute allowedRoles={['admin']}>
@@ -534,13 +526,7 @@ const AppContent: React.FC = () => {
             </AnimatedPage>
           </RoleRoute>
         } />
-        <Route path="/admin/consultants/:id/edit" element={
-          <RoleRoute allowedRoles={['admin']}>
-            <AnimatedPage>
-              <ConsultantEditPage />
-            </AnimatedPage>
-          </RoleRoute>
-        } />
+
         <Route path="/admin/activity-logs" element={
           <RoleRoute allowedRoles={['admin']}>
             <AnimatedPage>
@@ -573,6 +559,13 @@ const AppContent: React.FC = () => {
           <RoleRoute allowedRoles={['admin']}>
             <AnimatedPage>
               <SettingsPage />
+            </AnimatedPage>
+          </RoleRoute>
+        } />
+        <Route path="/admin/notifications" element={
+          <RoleRoute allowedRoles={['admin']}>
+            <AnimatedPage>
+              <NotificationManagementPage />
             </AnimatedPage>
           </RoleRoute>
         } />

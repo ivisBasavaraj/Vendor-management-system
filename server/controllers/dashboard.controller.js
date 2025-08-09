@@ -58,12 +58,21 @@ exports.getAdminDashboard = async (req, res) => {
       }
     ]);
     
-    // Get recent activity (last 10 activities)
-    const recentActivity = await Document.find()
-      .populate('vendor', 'name company')
+    // Get recent activity (last 10 activities) - exclude deactivated vendors
+    const allRecentActivity = await Document.find()
+      .populate({
+        path: 'vendor',
+        select: 'name company isActive',
+        match: { isActive: { $ne: false } }
+      })
       .sort({ updatedAt: -1 })
-      .limit(10)
+      .limit(20) // Get more to account for filtering
       .select('title status updatedAt vendor');
+    
+    // Filter out documents where vendor is null (deactivated users) and limit to 10
+    const recentActivity = allRecentActivity
+      .filter(doc => doc.vendor !== null)
+      .slice(0, 10);
     
     res.status(200).json({
       success: true,

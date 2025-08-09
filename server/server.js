@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 const http = require('http');
-const socketService = require('./utils/socketService');
+const webSocketService = require('./utils/webSocketService');
 const errorHandler = require('./middlewares/error.middleware');
 
 // Load environment variables
@@ -104,8 +104,8 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vendor-man
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.io
-socketService.initialize(server);
+// Initialize WebSocket
+webSocketService.initialize(server);
 
 mongoose.connect(MONGO_URI)
   .then(() => {

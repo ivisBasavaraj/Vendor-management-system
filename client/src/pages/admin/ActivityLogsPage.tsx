@@ -45,169 +45,10 @@ import {
   faFileExport
 } from '@fortawesome/free-solid-svg-icons';
 import MainLayout from '../../components/layout/MainLayout';
-import axios from 'axios';
+import { apiService } from '../../utils/api';
 import * as XLSX from 'xlsx';
 
-// Mock data for activity logs - comprehensive set covering both vendor and consultant activities
-const mockActivityLogs = [
-  // Today's activities
-  { 
-    id: '1', 
-    action: 'Document Uploaded', 
-    user: 'ABC Supplies (Vendor)', 
-    timestamp: new Date().toISOString().split('T')[0] + ' 14:30:22',
-    userType: 'vendor'
-  },
-  { 
-    id: '2', 
-    action: 'Document Reviewed', 
-    user: 'John Smith (Consultant)', 
-    timestamp: new Date().toISOString().split('T')[0] + ' 12:45:18',
-    userType: 'consultant'
-  },
-  
-  // Yesterday's activities
-  { 
-    id: '3', 
-    action: 'Document Approved', 
-    user: 'Sarah Johnson (Consultant)', 
-    timestamp: '2023-06-14 16:20:05',
-    userType: 'consultant'
-  },
-  { 
-    id: '4', 
-    action: 'Document Rejected', 
-    user: 'Michael Brown (Consultant)', 
-    timestamp: '2023-06-14 11:10:45',
-    userType: 'consultant'
-  },
-  
-  // Vendor activities
-  { 
-    id: '5', 
-    action: 'Document Updated', 
-    user: 'XYZ Manufacturing (Vendor)', 
-    timestamp: '2023-06-13 09:55:30',
-    userType: 'vendor'
-  },
-  { 
-    id: '6', 
-    action: 'User Login', 
-    user: 'Global Logistics (Vendor)', 
-    timestamp: '2023-06-13 08:30:12',
-    userType: 'vendor'
-  },
-  { 
-    id: '7', 
-    action: 'Password Reset', 
-    user: 'Tech Solutions (Vendor)', 
-    timestamp: '2023-06-12 17:15:40',
-    userType: 'vendor'
-  },
-  { 
-    id: '8', 
-    action: 'New Vendor Registered', 
-    user: 'Industrial Parts', 
-    timestamp: '2023-06-12 10:05:22',
-    userType: 'vendor'
-  },
-  
-  // Consultant activities
-  { 
-    id: '9', 
-    action: 'Document Downloaded', 
-    user: 'Emily Davis (Consultant)', 
-    timestamp: '2023-06-11 14:50:18',
-    userType: 'consultant'
-  },
-  { 
-    id: '10', 
-    action: 'Profile Updated', 
-    user: 'Robert Wilson (Consultant)', 
-    timestamp: '2023-06-11 11:25:33',
-    userType: 'consultant'
-  },
-  
-  // Admin activities
-  { 
-    id: '11', 
-    action: 'Settings Updated', 
-    user: 'Admin', 
-    timestamp: '2023-06-10 11:25:33',
-    userType: 'admin'
-  },
-  { 
-    id: '12', 
-    action: 'User Account Locked', 
-    user: 'Admin', 
-    timestamp: '2023-06-10 10:15:20',
-    userType: 'admin'
-  },
-  
-  // More vendor activities
-  { 
-    id: '13', 
-    action: 'Comment Added', 
-    user: 'ABC Supplies (Vendor)', 
-    timestamp: '2023-06-09 16:40:12',
-    userType: 'vendor'
-  },
-  { 
-    id: '14', 
-    action: 'Document Resubmitted', 
-    user: 'XYZ Manufacturing (Vendor)', 
-    timestamp: '2023-06-09 14:22:05',
-    userType: 'vendor'
-  },
-  
-  // More consultant activities
-  { 
-    id: '15', 
-    action: 'Feedback Provided', 
-    user: 'John Smith (Consultant)', 
-    timestamp: '2023-06-08 11:30:45',
-    userType: 'consultant'
-  },
-  { 
-    id: '16', 
-    action: 'Document Flagged', 
-    user: 'Sarah Johnson (Consultant)', 
-    timestamp: '2023-06-08 09:15:30',
-    userType: 'consultant'
-  },
-  
-  // System activities
-  { 
-    id: '17', 
-    action: 'System Backup', 
-    user: 'System', 
-    timestamp: '2023-06-07 02:00:00',
-    userType: 'admin'
-  },
-  { 
-    id: '18', 
-    action: 'Scheduled Maintenance', 
-    user: 'System', 
-    timestamp: '2023-06-06 01:00:00',
-    userType: 'admin'
-  },
-  
-  // Older activities
-  { 
-    id: '19', 
-    action: 'Bulk Documents Uploaded', 
-    user: 'Global Logistics (Vendor)', 
-    timestamp: '2023-06-05 15:45:22',
-    userType: 'vendor'
-  },
-  { 
-    id: '20', 
-    action: 'Bulk Review Completed', 
-    user: 'Michael Brown (Consultant)', 
-    timestamp: '2023-06-05 17:30:10',
-    userType: 'consultant'
-  }
-];
+
 
 // Styled Components
 const StyledCard = styled(Card)(({ theme }) => ({
@@ -253,7 +94,9 @@ const ActivitySummary: React.FC = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/activity-logs/stats');
+        const response = await apiService.activityLogs.getStats();
+        
+        console.log('Stats API Response:', response.data);
         
         if (response.data && response.data.success && response.data.data) {
           const { userTypeCounts } = response.data.data;
@@ -269,15 +112,13 @@ const ActivitySummary: React.FC = () => {
         console.error('Error fetching activity stats:', error);
         setLoading(false);
         
-        // Use mock stats in development
-        if (process.env.NODE_ENV === 'development') {
-          setStats({
-            vendor: 8,
-            consultant: 7,
-            admin: 3,
-            system: 2
-          });
-        }
+        // Keep stats at 0 on error
+        setStats({
+          vendor: 0,
+          consultant: 0,
+          admin: 0,
+          system: 0
+        });
       }
     };
 
@@ -368,6 +209,7 @@ const ActivityLogsPage: React.FC = () => {
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [userTypeFilter, setUserTypeFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
@@ -404,24 +246,40 @@ const ActivityLogsPage: React.FC = () => {
         queryParams.append('limit', rowsPerPage.toString());
         
         // Use the new dedicated activity logs API endpoint
-        const response = await axios.get(`/api/activity-logs?${queryParams.toString()}`);
+        const params = Object.fromEntries(queryParams.entries());
+        const response = await apiService.activityLogs.getAll(params);
+        
+        console.log('API Response:', response.data);
         
         if (response.data && response.data.success && response.data.data) {
-          // Transform the API response to match our expected format
-          const formattedLogs = response.data.data.map((item: any) => ({
-            id: item._id,
-            action: item.action,
-            user: item.userName,
-            timestamp: new Date(item.createdAt).toLocaleString(),
-            userType: item.userType
-          }));
+          console.log('Raw API data:', response.data.data);
           
+          // Transform the API response to match our expected format
+          const formattedLogs = response.data.data.map((item: any) => {
+            console.log('Processing item:', item);
+            return {
+              id: item._id,
+              action: item.action,
+              user: item.userName,
+              timestamp: new Date(item.createdAt).toLocaleString(),
+              userType: item.userType
+            };
+          });
+          
+          console.log('Formatted logs:', formattedLogs);
           setActivityLogs(formattedLogs);
-          console.log('Activity logs fetched successfully:', formattedLogs.length);
+          
+          // Set pagination info from API response
+          if (response.data.pagination) {
+            setTotalCount(response.data.pagination.total);
+            console.log('Pagination info:', response.data.pagination);
+          }
+          
+          console.log('Activity logs fetched successfully (active users only):', formattedLogs.length);
         } else {
-          // If API returns empty or error, use mock data in development
-          console.log('No activity logs found from API, using mock data');
-          setActivityLogs(mockActivityLogs);
+          // If API returns empty or error, set empty array
+          console.log('No activity logs found from API - Response structure:', response.data);
+          setActivityLogs([]);
         }
         
         setLoading(false);
@@ -429,11 +287,8 @@ const ActivityLogsPage: React.FC = () => {
         console.error('Error fetching activity logs:', error);
         setLoading(false);
         
-        // Fallback to mock data in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Using mock activity log data due to API error');
-          setActivityLogs(mockActivityLogs);
-        }
+        // Set empty array on error
+        setActivityLogs([]);
       }
     };
 
@@ -505,45 +360,7 @@ const ActivityLogsPage: React.FC = () => {
     setPage(0);
   };
 
-  const filteredLogs = activityLogs.filter(log => {
-    // Search term filter
-    const matchesSearch = 
-      ((log.action?.toLowerCase() || '').includes(searchTerm.toLowerCase())) ||
-      ((log.user?.toLowerCase() || '').includes(searchTerm.toLowerCase()));
-    
-    // User type filter
-    const matchesUserType = userTypeFilter === 'all' || log.userType === userTypeFilter;
-    
-    // Action filter
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
-    
-    // Date range filter
-    let matchesDateRange = true;
-    if (dateRange.startDate && log.timestamp) {
-      try {
-        const logDate = new Date(log.timestamp.split(' ')[0]);
-        const startDate = new Date(dateRange.startDate);
-        if (logDate < startDate) {
-          matchesDateRange = false;
-        }
-      } catch (error) {
-        console.error('Error parsing date:', error);
-      }
-    }
-    if (dateRange.endDate && log.timestamp) {
-      try {
-        const logDate = new Date(log.timestamp.split(' ')[0]);
-        const endDate = new Date(dateRange.endDate);
-        if (logDate > endDate) {
-          matchesDateRange = false;
-        }
-      } catch (error) {
-        console.error('Error parsing date:', error);
-      }
-    }
-    
-    return matchesSearch && matchesUserType && matchesAction && matchesDateRange;
-  });
+  // Backend handles all filtering, so no client-side filtering needed
 
   // Get unique actions for filter
   const uniqueActions = ['all', ...Array.from(new Set(activityLogs.filter(log => log && log.action).map(log => log.action)))];
@@ -795,9 +612,7 @@ const ActivityLogsPage: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredLogs
-                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                        .map((log, index) => (
+                      {activityLogs.map((log, index) => (
                           <TableRow
                             hover
                             key={log.id}
@@ -807,7 +622,7 @@ const ActivityLogsPage: React.FC = () => {
                                 transform: 'scale(1.001)',
                                 transition: 'all 0.2s ease-in-out'
                               },
-                              borderBottom: index === filteredLogs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.06)'
+                              borderBottom: index === activityLogs.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.06)'
                             }}
                           >
                             <TableCell sx={{ py: 2.5 }}>
@@ -841,7 +656,7 @@ const ActivityLogsPage: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         ))}
-                      {filteredLogs.length === 0 && (
+                      {activityLogs.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                             <Box sx={{ textAlign: 'center' }}>
@@ -849,7 +664,10 @@ const ActivityLogsPage: React.FC = () => {
                                 No Activity Logs Found
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                There are no activity logs matching your current filters.
+                                No activity logs from active users match your current filters.
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                Only activities from active users are displayed.
                               </Typography>
                             </Box>
                           </TableCell>
@@ -862,7 +680,7 @@ const ActivityLogsPage: React.FC = () => {
                   <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
-                    count={filteredLogs.length}
+                    count={totalCount}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}

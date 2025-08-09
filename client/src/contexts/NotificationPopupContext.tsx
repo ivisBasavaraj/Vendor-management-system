@@ -156,18 +156,94 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
     removeNotification(id);
   }, [removeNotification]);
 
-  // Listen for WebSocket notifications
+  // Listen for WebSocket notifications using Socket.IO
   useEffect(() => {
     if (!socket || !user) return;
 
+    // Socket.IO event listeners
+    const handleNotification = (data: any) => {
+      console.log('Received Socket.IO notification:', data);
+      
+      // Convert Socket.IO notification to PopupNotification format
+      const popupNotification: Omit<PopupNotification, 'id'> = {
+        title: data.title || 'New Notification',
+        message: data.message || '',
+        type: data.type || 'system',
+        priority: data.priority || 'medium',
+        createdAt: data.createdAt || new Date().toISOString(),
+        sender: data.sender,
+        relatedDocument: data.relatedDocument,
+        actionUrl: data.actionUrl,
+      };
+
+      showNotification(popupNotification);
+    };
+
+    const handleLoginApprovalRequest = (data: any) => {
+      console.log('Received login approval request:', data);
+      
+      const popupNotification: Omit<PopupNotification, 'id'> = {
+        title: 'New Login Approval Request',
+        message: `${data.vendor?.name || 'A vendor'} is requesting login approval`,
+        type: 'login_request',
+        priority: 'high',
+        createdAt: data.createdAt || new Date().toISOString(),
+        sender: {
+          name: data.vendor?.name || 'Unknown Vendor',
+          email: data.vendor?.email || ''
+        },
+        actionUrl: '/login-approvals'
+      };
+
+      showNotification(popupNotification);
+    };
+
+    const handleLoginApprovalUpdate = (data: any) => {
+      console.log('Received login approval update:', data);
+      
+      const popupNotification: Omit<PopupNotification, 'id'> = {
+        title: 'Login Approval Update',
+        message: `Your login request has been ${data.status}`,
+        type: data.status === 'approved' ? 'login_approved' : 'login_rejected',
+        priority: 'high',
+        createdAt: data.timestamp || new Date().toISOString(),
+        sender: {
+          name: data.approverName || 'System',
+          email: ''
+        }
+      };
+
+      showNotification(popupNotification);
+    };
+
+    const handlePasswordResetRequest = (data: any) => {
+      console.log('Received password reset request:', data);
+      
+      const popupNotification: Omit<PopupNotification, 'id'> = {
+        title: 'Password Reset Request',
+        message: `${data.user?.name || 'A user'} has requested a password reset`,
+        type: 'system',
+        priority: 'medium',
+        createdAt: data.timestamp || new Date().toISOString(),
+        sender: {
+          name: data.user?.name || 'Unknown User',
+          email: data.user?.email || ''
+        },
+        actionUrl: '/admin/users'
+      };
+
+      showNotification(popupNotification);
+    };
+
+    // Handle generic WebSocket messages (fallback)
     const handleWebSocketMessage = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data);
-        console.log('Received WebSocket notification:', data);
+        const message = JSON.parse(event.data);
+        console.log('Received WebSocket message:', message);
         
-        // Check if this is a notification message
-        if (data.type === 'notification' || data.event === 'notification') {
-          const notificationData = data.data || data;
+        // Handle different message types
+        if (message.type === 'notification') {
+          const notificationData = message.data;
           
           // Convert WebSocket notification to PopupNotification format
           const popupNotification: Omit<PopupNotification, 'id'> = {
@@ -182,16 +258,35 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
           };
 
           showNotification(popupNotification);
+        } else if (message.type === 'login_approval_request') {
+          handleLoginApprovalRequest(message.data);
+        } else if (message.type === 'login_approval_update') {
+          handleLoginApprovalUpdate(message.data);
+        } else if (message.type === 'password_reset_request') {
+          handlePasswordResetRequest(message.data);
+        } else if (message.type === 'authenticated') {
+          console.log('WebSocket authenticated successfully:', message);
+        } else if (message.type === 'connection') {
+          console.log('WebSocket connection confirmed:', message);
+        } else if (message.type === 'error') {
+          console.error('WebSocket error:', message.message);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
     };
 
-    socket.addEventListener('message', handleWebSocketMessage);
+    // Register WebSocket event listeners
+    if (socket && typeof socket.addEventListener === 'function') {
+      // WebSocket message events
+      socket.addEventListener('message', handleWebSocketMessage);
+    }
 
     return () => {
-      socket.removeEventListener('message', handleWebSocketMessage);
+      if (socket && typeof socket.removeEventListener === 'function') {
+        // WebSocket cleanup
+        socket.removeEventListener('message', handleWebSocketMessage);
+      }
     };
   }, [socket, user, showNotification]);
 
@@ -203,6 +298,8 @@ export const NotificationPopupProvider: React.FC<NotificationPopupProviderProps>
       });
     }
   }, []);
+
+
 
   const contextValue: NotificationPopupContextType = {
     showNotification,

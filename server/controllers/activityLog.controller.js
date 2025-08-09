@@ -52,7 +52,7 @@ exports.getAllActivityLogs = async (req, res) => {
     });
     
     // Build query filters
-    const filter = {};
+    let filter = {};
     
     // Filter by user type
     if (userType && userType !== 'all') {
@@ -78,18 +78,51 @@ exports.getAllActivityLogs = async (req, res) => {
       }
     }
     
+    // Get active user IDs to filter activity logs
+    const activeUsers = await User.find({ isActive: true }).select('_id');
+    const activeUserIds = activeUsers.map(user => user._id);
+    
+    // Filter to only show logs from active users or system activities
+    const activeUserFilter = {
+      $or: [
+        { userId: { $in: activeUserIds } }, // Activities from active users
+        { userType: 'system' }, // System activities (always show)
+        { userId: { $exists: false } } // Activities without userId (legacy/system)
+      ]
+    };
+    
     // Search functionality
     if (search) {
       const searchRegex = new RegExp(search, 'i');
-      filter.$or = [
-        { userName: searchRegex },
-        { action: searchRegex },
-        { description: searchRegex },
-        { documentType: searchRegex }
-      ];
+      const searchFilter = {
+        $or: [
+          { userName: searchRegex },
+          { action: searchRegex },
+          { description: searchRegex },
+          { documentType: searchRegex }
+        ]
+      };
+      
+      // Combine active user filter with search filter
+      filter = {
+        $and: [
+          filter, // Original date/userType filters
+          activeUserFilter, // Active user filter
+          searchFilter // Search filter
+        ]
+      };
+    } else {
+      // Just combine with active user filter
+      filter = {
+        $and: [
+          filter, // Original date/userType filters
+          activeUserFilter // Active user filter
+        ]
+      };
     }
     
     console.log('Using filter:', JSON.stringify(filter));
+    console.log('Active users found:', activeUserIds.length);
     
     // First, check if we have any activity logs at all
     const totalCount = await ActivityLog.countDocuments({});
@@ -116,7 +149,8 @@ exports.getAllActivityLogs = async (req, res) => {
       limit: parseInt(limit, 10),
       sort: { createdAt: -1 }, // Sort by most recent first
       populate: [
-        { path: 'documentId', select: 'name type status' }
+        { path: 'documentId', select: 'name type status' },
+        { path: 'userId', select: 'name email isActive' }
       ]
     };
     
@@ -128,7 +162,7 @@ exports.getAllActivityLogs = async (req, res) => {
       
       return res.status(200).json({
         success: true,
-        message: 'Activity logs retrieved successfully',
+        message: 'Activity logs retrieved successfully (active users only)',
         data: activityLogs.docs,
         pagination: {
           total: activityLogs.totalDocs,
@@ -147,13 +181,14 @@ exports.getAllActivityLogs = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit, 10))
-        .populate({ path: 'documentId', select: 'name type status' });
+        .populate({ path: 'documentId', select: 'name type status' })
+        .populate({ path: 'userId', select: 'name email isActive' });
       
       const count = await ActivityLog.countDocuments(filter);
       
       return res.status(200).json({
         success: true,
-        message: 'Activity logs retrieved successfully (fallback method)',
+        message: 'Activity logs retrieved successfully (fallback method, active users only)',
         data: docs,
         pagination: {
           total: count,
@@ -386,17 +421,32 @@ exports.getDocumentActivityLogs = async (req, res) => {
  */
 exports.getActivityStats = async (req, res) => {
   try {
-    console.log('Fetching activity statistics');
+    console.log('Fetching activity statistics (active users only)');
     
-    // First, check if we have any activity logs at all
-    const totalCount = await ActivityLog.countDocuments({});
-    console.log('Total activity logs in database:', totalCount);
+    // Get active user IDs to filter activity logs
+    const activeUsers = await User.find({ isActive: true }).select('_id');
+    const activeUserIds = activeUsers.map(user => user._id);
+    
+    // Create filter for active users or system activities
+    const activeUserFilter = {
+      $or: [
+        { userId: { $in: activeUserIds } }, // Activities from active users
+        { userType: 'system' }, // System activities (always show)
+        { userId: { $exists: false } } // Activities without userId (legacy/system)
+      ]
+    };
+    
+    console.log('Active users found:', activeUserIds.length);
+    
+    // First, check if we have any activity logs from active users
+    const totalCount = await ActivityLog.countDocuments(activeUserFilter);
+    console.log('Total activity logs from active users:', totalCount);
     
     if (totalCount === 0) {
-      console.log('No activity logs found, returning empty stats');
+      console.log('No activity logs from active users found, returning empty stats');
       return res.status(200).json({
         success: true,
-        message: 'No activity logs found in the database',
+        message: 'No activity logs from active users found',
         data: {
           userTypeCounts: { vendor: 0, consultant: 0, admin: 0, system: 0 },
           topActions: [],
@@ -405,8 +455,9 @@ exports.getActivityStats = async (req, res) => {
       });
     }
     
-    // Get counts by user type
+    // Get counts by user type (active users only)
     const userTypeCounts = await ActivityLog.aggregate([
+      { $match: activeUserFilter }, // Filter for active users
       {
         $group: {
           _id: '$userType',
@@ -417,8 +468,9 @@ exports.getActivityStats = async (req, res) => {
     
     console.log('User type counts:', userTypeCounts);
     
-    // Get counts by action type
+    // Get counts by action type (active users only)
     const actionCounts = await ActivityLog.aggregate([
+      { $match: activeUserFilter }, // Filter for active users
       {
         $group: {
           _id: '$action',
@@ -442,7 +494,10 @@ exports.getActivityStats = async (req, res) => {
     const dailyActivity = await ActivityLog.aggregate([
       {
         $match: {
-          createdAt: { $gte: thirtyDaysAgo }
+          $and: [
+            activeUserFilter, // Filter for active users
+            { createdAt: { $gte: thirtyDaysAgo } } // Last 30 days
+          ]
         }
       },
       {
@@ -503,7 +558,7 @@ exports.getActivityStats = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: 'Activity statistics retrieved successfully',
+      message: 'Activity statistics retrieved successfully (active users only)',
       data: {
         userTypeCounts: userTypeCountsObj,
         topActions: actionCounts,

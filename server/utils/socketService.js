@@ -73,6 +73,21 @@ class SocketService {
     }
   }
 
+  // Get connected users count
+  getConnectedUsersCount() {
+    return this.connections.size;
+  }
+
+  // Get all connected user IDs
+  getConnectedUserIds() {
+    return Array.from(this.connections.keys());
+  }
+
+  // Check if user is connected
+  isUserConnected(userId) {
+    return this.connections.has(userId);
+  }
+
   // Send login approval request notification to admins and consultants
   sendLoginApprovalRequest(loginApproval, vendor) {
     if (this.io) {
