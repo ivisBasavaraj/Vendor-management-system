@@ -15,9 +15,13 @@ export const getFullImageUrl = (imageUrl: string | null | undefined): string => 
     return imageUrl;
   }
   
-  // If it's a relative URL, prepend the server URL
+  // If it's a relative URL, prepend the API server URL (not client URL)
   const serverUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
-  return `${serverUrl}${imageUrl}`;
+  
+  // Ensure the imageUrl starts with a slash
+  const normalizedImageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+  
+  return `${serverUrl}${normalizedImageUrl}`;
 };
 
 /**

@@ -381,6 +381,10 @@ const UserForm: React.FC<UserFormProps> = ({ mode }) => {
                       onError={(e) => {
                         console.error('Failed to load image:', logoPreview);
                         console.error('Image error event:', e);
+                        // Show a fallback or placeholder
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        // You could set a fallback image here if needed
                       }}
                       onLoad={() => {
                         console.log('Image loaded successfully:', logoPreview);

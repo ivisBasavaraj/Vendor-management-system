@@ -49,8 +49,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isConnected, setIsConnected] = useState(false);
   const [loginApprovalNotifications, setLoginApprovalNotifications] = useState<LoginApprovalNotification[]>([]);
   const [documentNotifications, setDocumentNotifications] = useState<DocumentNotification[]>([]);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const maxReconnectAttempts = 5;
 
-  useEffect(() => {
+  const connectWebSocket = () => {
     if (!user) return;
 
     // Get WebSocket URL from environment or use a secure fallback for production
@@ -59,50 +61,76 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const wsUrl = wsBaseUrl.replace(/^https?:/, wsProtocol) + '/ws';
     
     console.log('Connecting to WebSocket at:', wsUrl);
-    const ws = new WebSocket(wsUrl);
+    
+    try {
+      const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-      console.log('WebSocket connection established');
-      setIsConnected(true);
-      setSocket(ws);
-      
-      // Send authentication message
-      ws.send(JSON.stringify({
-        type: 'authenticate',
-        userId: user.id,
-        role: user.role
-      }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('Received WebSocket message:', message);
+      ws.onopen = () => {
+        console.log('WebSocket connection established');
+        setIsConnected(true);
+        setSocket(ws);
+        setReconnectAttempts(0);
         
-        if (message.type === 'login_approval') {
-          addLoginApprovalNotification(message.data);
-        } else if (message.type === 'notification') {
-          addDocumentNotification(message.data);
+        // Send authentication message
+        ws.send(JSON.stringify({
+          type: 'authenticate',
+          userId: user.id,
+          role: user.role
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('Received WebSocket message:', message);
+          
+          if (message.type === 'login_approval') {
+            addLoginApprovalNotification(message.data);
+          } else if (message.type === 'notification') {
+            addDocumentNotification(message.data);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
         }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
+      };
 
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      setIsConnected(false);
-      setSocket(null);
-    };
+      ws.onclose = (event) => {
+        console.log('WebSocket connection closed', event.code, event.reason);
+        setIsConnected(false);
+        setSocket(null);
+        
+        // Attempt to reconnect if not a manual close
+        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+          const timeout = Math.pow(2, reconnectAttempts) * 1000; // Exponential backoff
+          console.log(`Attempting to reconnect in ${timeout}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+          setTimeout(() => {
+            setReconnectAttempts(prev => prev + 1);
+            connectWebSocket();
+          }, timeout);
+        }
+      };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setIsConnected(false);
+      };
+
+      return ws;
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
       setIsConnected(false);
-    };
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const ws = connectWebSocket();
 
     return () => {
-      console.log('Cleaning up WebSocket connection');
-      ws.close();
+      if (ws) {
+        console.log('Cleaning up WebSocket connection');
+        ws.close(1000, 'Component unmounting');
+      }
     };
   }, [user]);
 

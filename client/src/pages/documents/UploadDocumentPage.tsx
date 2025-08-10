@@ -510,7 +510,28 @@ const UploadDocumentPage: React.FC = () => {
     if (!agreementPeriodStr) return null;
     
     // Try to extract date patterns from the agreement period string
-    // Common formats: "2024-2025", "April 2024 - March 2025", "Annual Contract (2024-2025)", etc.
+    // Common formats: "2024-2025", "April 2024 - March 2025", "Annual Contract (2024-2025)", "1 April 2025 to 26 August 2025", etc.
+    
+    // Pattern 0: Look for specific date range format like "1 April 2025 to 26 August 2025"
+    const dateRangeMatch = agreementPeriodStr.match(/(\d{1,2}\s+\w+\s+\d{4})\s+to\s+(\d{1,2}\s+\w+\s+\d{4})/i);
+    if (dateRangeMatch) {
+      let endDateStr = dateRangeMatch[2];
+      
+      // Fix common typos in month names
+      endDateStr = endDateStr
+        .replace(/agust/gi, 'august')
+        .replace(/septemb/gi, 'september')
+        .replace(/octob/gi, 'october')
+        .replace(/novemb/gi, 'november')
+        .replace(/decemb/gi, 'december')
+        .replace(/febru/gi, 'february');
+      
+      const endDate = new Date(endDateStr);
+      
+      if (!isNaN(endDate.getTime())) {
+        return endDate;
+      }
+    }
     
     // Pattern 1: Look for year ranges like "2024-2025" or "(2024-2025)"
     const yearRangeMatch = agreementPeriodStr.match(/(\d{4})-(\d{4})/);

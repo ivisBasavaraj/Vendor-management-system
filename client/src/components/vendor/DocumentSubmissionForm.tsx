@@ -96,7 +96,17 @@ const parseAgreementPeriod = (agreementPeriod: string, createdAt: string): { end
   // Check if agreement period is in date range format (e.g., "1 July 2025 to 15 July 2025")
   const dateRangeMatch = periodString.match(/(\d{1,2}\s+\w+\s+\d{4})\s+to\s+(\d{1,2}\s+\w+\s+\d{4})/i);
   if (dateRangeMatch) {
-    const endDateStr = dateRangeMatch[2];
+    let endDateStr = dateRangeMatch[2];
+    
+    // Fix common typos in month names
+    endDateStr = endDateStr
+      .replace(/agust/gi, 'august')
+      .replace(/septemb/gi, 'september')
+      .replace(/octob/gi, 'october')
+      .replace(/novemb/gi, 'november')
+      .replace(/decemb/gi, 'december')
+      .replace(/febru/gi, 'february');
+    
     const endDate = new Date(endDateStr);
     
     if (!isNaN(endDate.getTime())) {
@@ -294,6 +304,8 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
     endDate: null
   });
   
+
+  
   // Load assigned consultant and document details (if in resubmit mode)
   useEffect(() => {
     const fetchData = async () => {
@@ -317,7 +329,7 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
               const expiryInfo = checkAgreementExpiry(userData.agreementPeriod, userData.createdAt);
               setAgreementExpiryWarning(expiryInfo);
               
-              console.log('Agreement expiry check result:', {
+              console.log('🔍 Agreement expiry check result:', {
                 agreementPeriod: userData.agreementPeriod,
                 createdAt: userData.createdAt,
                 endDate: expiryInfo.endDate,
@@ -326,9 +338,11 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
               });
               
               if (expiryInfo.isExpiring) {
-                console.log(`⚠️ Agreement expiring in ${expiryInfo.daysRemaining} days!`);
+                console.log(`⚠️ Agreement expiring in ${expiryInfo.daysRemaining} days! WARNING SHOULD BE VISIBLE!`);
               } else if (expiryInfo.endDate && expiryInfo.daysRemaining <= 0) {
                 console.log(`❌ Agreement has already expired! (${Math.abs(expiryInfo.daysRemaining)} days ago)`);
+              } else {
+                console.log(`✅ Agreement is active. ${expiryInfo.daysRemaining} days remaining. No warning needed.`);
               }
             }
             
@@ -1131,87 +1145,9 @@ const DocumentSubmissionForm: React.FC<DocumentSubmissionFormProps> = ({ mode = 
                     )}
                   </div>
                   
-                  {agreementExpiryWarning.isExpiring ? (
-                    <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 rounded-md">
-                      <div className="flex items-center">
-                        <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
-                        <div>
-                          <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                            Your agreement is expiring soon!
-                          </p>
-                          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                            {agreementExpiryWarning.daysRemaining === 0 
-                              ? 'Your agreement expires today' 
-                              : `Your agreement expires in ${agreementExpiryWarning.daysRemaining} day${agreementExpiryWarning.daysRemaining !== 1 ? 's' : ''}`
-                            }
-                            {agreementExpiryWarning.endDate && (
-                              <span className="ml-1">
-                                ({agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
-                                  year: 'numeric', 
-                                  month: 'short', 
-                                  day: 'numeric' 
-                                })})
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-sm text-red-700 dark:text-red-300 mt-1 font-medium">
-                            Contact your consultant immediately to renew your agreement.
-                          </p>
-                          {consultantEmail && (
-                            <div className="mt-2 flex items-center space-x-2">
-                              <a
-                                href={`mailto:${consultantEmail}?subject=Agreement Renewal Request&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement is expiring soon. Please help me with the renewal process.%0D%0A%0D%0AThank you.`}
-                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
-                              >
-                                Contact Consultant
-                              </a>
-                              <span className="text-xs text-red-600 dark:text-red-400">
-                                {consultantEmail}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (!agreementExpiryWarning.isExpiring && agreementExpiryWarning.endDate && agreementExpiryWarning.daysRemaining <= 0) ? (
-                    <div className="mt-2 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/30 rounded-md">
-                      <div className="flex items-center">
-                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mr-2" />
-                        <div>
-                          <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                            Your agreement has expired!
-                          </p>
-                          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                            Agreement expired on {agreementExpiryWarning.endDate.toLocaleDateString('en-US', { 
-                              year: 'numeric', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })} ({Math.abs(agreementExpiryWarning.daysRemaining)} day{Math.abs(agreementExpiryWarning.daysRemaining) !== 1 ? 's' : ''} ago)
-                          </p>
-                          <p className="text-sm text-red-700 dark:text-red-300 mt-1 font-medium">
-                            Contact your consultant immediately to renew your agreement.
-                          </p>
-                          {consultantEmail && (
-                            <div className="mt-2 flex items-center space-x-2">
-                              <a
-                                href={`mailto:${consultantEmail}?subject=URGENT: Expired Agreement Renewal&body=Dear ${consultantName || 'Consultant'},%0D%0A%0D%0AMy agreement has expired and I need immediate assistance with the renewal process.%0D%0A%0D%0AExpiry Date: ${agreementExpiryWarning.endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}%0D%0A%0D%0APlease contact me urgently.%0D%0A%0D%0AThank you.`}
-                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
-                              >
-                                Contact Consultant URGENTLY
-                              </a>
-                              <span className="text-xs text-red-600 dark:text-red-400">
-                                {consultantEmail}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      This field is set by the administrator and cannot be modified.
-                    </p>
-                  )}</div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    This field is set by the administrator and cannot be modified.
+                  </p></div>
                 
                 {/* Consultant Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
