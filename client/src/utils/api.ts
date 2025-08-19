@@ -9,7 +9,7 @@ import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
 // API URL from environment or default
 // Using base URL without /api suffix to avoid duplication
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://vendor-management-system-api.herokuapp.com';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.vendors.biec.in';
 const API_PREFIX = '/api';
 
 // Log the API base URL being used
@@ -384,10 +384,10 @@ const apiService = {
       
       // Don't set Content-Type header manually, let the browser set it with the boundary
       return api.post(`${API_PREFIX}/document-submissions/create`, formData, {
-        headers: { 
-          // Remove Content-Type so browser can set it with proper boundary
+        headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        withCredentials: true
       });
     },
     
