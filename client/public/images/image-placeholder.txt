@@ -1,0 +1,7 @@
+Place the following 3D floor images in this directory:
+
+1. 3d-floor-admin.jpg - Blue-themed 3D floor for admin login
+2. 3d-floor-vendor.jpg - Green-themed 3D floor for vendor login
+3. 3d-floor-consultant.jpg - Purple-themed 3D floor for consultant login
+
+See README.md for more details on image requirements and sources.

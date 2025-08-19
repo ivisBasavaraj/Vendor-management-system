@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PDF Report Generation - IMTMA VMS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        }
+        .test-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .info-box h4 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .feature-list li:before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.loading {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">PDF Report Generation Test</h1>
+            <p class="subtitle">Test the professional 2-page compliance verification report</p>
+        </div>
+
+        <div class="test-section">
+            <h3>Professional 2-Page Compliance Report Features</h3>
+            <ul class="feature-list">
+                <li>Optimized 2-page layout with neat content distribution</li>
+                <li>Page 1: Complete vendor information and compliance summary</li>
+                <li>Page 2: Comprehensive documents verification checklist</li>
+                <li>Professional headers with organization logos on both pages</li>
+                <li>Certification section with signature areas</li>
+                <li>Consistent footers with report generation details</li>
+                <li>Professional styling with proper spacing and fonts</li>
+                <li>Windows-optimized layout for printing and viewing</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>Report Generation Tests</h3>
+            <div class="info-box">
+                <h4>Instructions:</h4>
+                <p>Click the buttons below to generate and download different types of PDF reports. Each report will be properly formatted across multiple pages for professional presentation.</p>
+            </div>
+            
+            <button class="test-button" onclick="generateSampleReport()">
+                Generate Sample Compliance Report
+                <span id="sample-status" class="status" style="display: none;"></span>
+            </button>
+            
+            <button class="test-button" onclick="generateTestVerificationReport()">
+                Generate Test Verification Report
+                <span id="verification-status" class="status" style="display: none;"></span>
+            </button>
+            
+            <button class="test-button" onclick="viewSampleHTML()">
+                View Multi-Page HTML Sample
+            </button>
+            
+            <button class="test-button" onclick="viewTwoPageHTML()">
+                View 2-Page HTML Sample
+            </button>
+        </div>
+
+        <div class="test-section">
+            <h3>2-Page Report Structure</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 6px; border: 1px solid #dee2e6; text-align: center;">
+                    <h4 style="color: #007bff; margin: 0 0 15px 0;">Page 1: Compliance Verification Report</h4>
+                    <div style="text-align: left; font-size: 14px;">
+                        <strong>Content:</strong>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>Header with organization logos</li>
+                            <li>Report title and information</li>
+                            <li>Complete vendor information table</li>
+                            <li>Compliance summary with statistics</li>
+                            <li>Certification statement</li>
+                            <li>Signature sections for auditor and seal</li>
+                        </ul>
+                    </div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 6px; border: 1px solid #dee2e6; text-align: center;">
+                    <h4 style="color: #007bff; margin: 0 0 15px 0;">Page 2: Documents Verification Checklist</h4>
+                    <div style="text-align: left; font-size: 14px;">
+                        <strong>Content:</strong>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>Header with organization logos</li>
+                            <li>Documents verification title</li>
+                            <li>Period specification (July 2025)</li>
+                            <li>Complete documents table (10 documents)</li>
+                            <li>Verification status for each document</li>
+                            <li>Compliance remarks for each item</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Technical Details</h3>
+            <p><strong>PDF Library:</strong> jsPDF with autoTable plugin</p>
+            <p><strong>Page Format:</strong> A4 Portrait (210 × 297 mm)</p>
+            <p><strong>Margins:</strong> 20mm on all sides</p>
+            <p><strong>Font:</strong> Helvetica (Windows-compatible)</p>
+            <p><strong>Logo Support:</strong> PNG images with fallback placeholders</p>
+            <p><strong>Page Breaks:</strong> Automatic with content-aware positioning</p>
+        </div>
+    </div>
+
+    <script>
+        // Note: In a real application, these functions would import from the actual PDF utilities
+        // For this demo, we'll show the structure and provide download links
+        
+        function showStatus(elementId, message, type) {
+            const statusElement = document.getElementById(elementId);
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            statusElement.style.display = 'inline';
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function generateSampleReport() {
+            showStatus('sample-status', 'Generating...', 'loading');
+            
+            // Simulate PDF generation
+            setTimeout(() => {
+                showStatus('sample-status', 'Generated!', 'success');
+                alert('2-Page Compliance Report would be generated and downloaded.\n\nThis optimized report includes:\n1. Page 1: Complete vendor information, compliance summary, and certification\n2. Page 2: Documents verification checklist for July 2025\n3. Professional headers and footers on both pages\n4. All content neatly distributed across exactly 2 pages');
+            }, 1500);
+        }
+        
+        function generateTestVerificationReport() {
+            showStatus('verification-status', 'Generating...', 'loading');
+            
+            setTimeout(() => {
+                showStatus('verification-status', 'Generated!', 'success');
+                alert('Test Verification Report would be generated.\n\nThis would create a professional multi-page document verification report with:\n1. Cover page with branding\n2. Vendor information section\n3. Document verification details\n4. Summary and certification');
+            }, 1500);
+        }
+        
+        function viewSampleHTML() {
+            window.open('/sample-compliance-report.html', '_blank');
+        }
+        
+        function viewTwoPageHTML() {
+            window.open('/two-page-compliance-report.html', '_blank');
+        }
+        
+        // Display current date and time
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            const timeStr = now.toLocaleTimeString('en-US');
+            
+            console.log(`PDF Test Page loaded on ${dateStr} at ${timeStr}`);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Loading</title>
+</head>
+<body>
+    <h1>Image Loading Test</h1>
+    <img src="/images/BIEC.png" alt="BIEC Logo" style="border: 1px solid black; max-width: 300px;">
+    <br><br>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png" alt="IMTMA Logo" style="border: 1px solid black; max-width: 300px;">
+    
+    <script>
+        // Test loading images with fetch
+        fetch('/images/BIEC.png')
+            .then(response => {
+                console.log('BIEC logo fetch response:', response.ok, response.status);
+                if (response.ok) {
+                    console.log('✅ BIEC logo is accessible');
+                } else {
+                    console.log('❌ BIEC logo is not accessible');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching BIEC logo:', error);
+            });
+            
+        fetch('https://upload.wikimedia.org/wikipedia/commons/d/d8/IMTMA.png')
+            .then(response => {
+                console.log('IMTMA logo fetch response:', response.ok, response.status);
+                if (response.ok) {
+                    console.log('✅ IMTMA logo is accessible');
+                } else {
+                    console.log('❌ IMTMA logo is not accessible');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching IMTMA logo:', error);
+            });
+    </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  "proxy": "http://localhost:5000",
+  "dependencies": {
+    "@emailjs/browser": "^4.4.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@headlessui/react": "^1.7.19",
+    "@heroicons/react": "^2.2.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.1.0",
+    "@tanstack/react-query": "^5.76.1",
+    "@tanstack/react-table": "^8.13.2",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.126",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "@types/socket.io-client": "^1.4.36",
+    "axios": "^1.9.0",
+    "date-fns": "^2.30.0",
+    "framer-motion": "^11.18.2",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "jwt-decode": "^4.0.0",
+    "postcss-flexbugs-fixes": "^4.2.1",
+    "postcss-preset-env": "^6.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.8",
+    "react-hook-form": "^7.56.3",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.6.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^2.15.3",
+    "socket.io-client": "^4.8.1",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5",
+    "zod": "^3.22.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all",
+      "Chrome >= 88",
+      "Edge >= 88",
+      "Firefox >= 78",
+      "ie 11"
+    ],
+    "development": [
+      "last 2 chrome version",
+      "last 2 firefox version",
+      "last 2 edge version",
+      "Chrome >= 88",
+      "Edge >= 88",
+      "Firefox >= 78"
+    ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.13",
+    "postcss": "^8.4.19",
+    "tailwindcss": "^3.2.4"
+  }
+}

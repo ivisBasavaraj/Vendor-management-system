@@ -1,0 +1,31 @@
+{
+  "name": "vendor-management-system",
+  "version": "1.0.0",
+  "description": "Vendor Management System with document tracking",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "nodemon server/server.js",
+    "client": "npm start --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "cd client && npm install && npm run build",
+    "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix client && npm run build --prefix client",
+    "setup-emailjs": "node setup-emailjs.js",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "email-test": "echo 'Use the admin dashboard email test component or API endpoints at /api/email/test'"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "vendor",
+    "document",
+    "management",
+    "tracking"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
