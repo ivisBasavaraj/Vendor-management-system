@@ -131,7 +131,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 500 * 1024 * 1024 // 500MB limit
   }
 });
 
@@ -441,7 +441,7 @@ exports.viewFile = async (req, res) => {
 
     // Handle Windows absolute paths (D:\path\to\file)
     if (resolvedFilePath.match(/^[A-Z]:\\/i)) {
-      console.log('Detected Windows absolute path');
+      console.log('Detected Windows absolute path, extracting filename');
       // Extract just the filename from the Windows path
       const fileName = path.basename(resolvedFilePath);
       console.log('Extracted filename from Windows path:', fileName);
@@ -3384,5 +3384,3 @@ const getMonthName = (monthNumber) => {
 // Export notification functions for use in other controllers
 module.exports.createDocumentReviewNotification = createDocumentReviewNotification;
 module.exports.createCompletionNotification = createCompletionNotification;
-
-

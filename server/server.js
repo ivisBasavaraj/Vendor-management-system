@@ -13,57 +13,36 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
-// CORS Configuration for EmailJS and local development
+// CORS Configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://vendors.biec.in',
+  'https://www.vendors.biec.in',
+  'https://api.vendors.biec.in',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log(`CORS request from origin: ${origin}`);
-    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log('Allowing request with null origin');
-      return callback(null, true);
-    }
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
-      'https://api.emailjs.com',
-      'https://vendors.biec.in',
-      'https://www.vendors.biec.in', // Added www variant
-      'https://api.vendors.biec.in', // Added API domain
-      process.env.CLIENT_URL
-    ].filter(Boolean); // Remove undefined values
-    
-    console.log('Allowed origins:', allowedOrigins);
-    
-    if (allowedOrigins.includes(origin)) {
-      console.log(`Origin ${origin} is allowed`);
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('CORS request from origin:', origin);
-      // In production, be more strict about CORS
-      if (process.env.NODE_ENV === 'production') {
-        // Only allow specific origins in production
-        callback(new Error('Not allowed by CORS'));
-      } else {
-        // Allow all origins in development
-        callback(null, true);
-      }
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
   optionsSuccessStatus: 200, // For legacy browser support
-  exposedHeaders: ['Content-Disposition'] // Add any custom headers you want to expose
+  exposedHeaders: ['Content-Disposition']
 };
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -83,7 +62,6 @@ const activityLogRoutes = require('./routes/activityLog.routes');
 const complianceReportRoutes = require('./routes/complianceReport.routes');
 const emailRoutes = require('./routes/email.routes');
 
-
 // Handle OPTIONS requests first
 app.options('*', cors(corsOptions));
 
@@ -101,7 +79,6 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/compliance-reports', complianceReportRoutes);
 app.use('/api/email', emailRoutes);
-
 
 // Home route
 app.get('/', (req, res) => {
