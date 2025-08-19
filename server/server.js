@@ -16,6 +16,7 @@ const app = express();
 // CORS Configuration for EmailJS and local development
 const corsOptions = {
   origin: function (origin, callback) {
+<<<<<<< HEAD
     console.log(`CORS request from origin: ${origin}`);
     
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -23,6 +24,10 @@ const corsOptions = {
       console.log('Allowing request with null origin');
       return callback(null, true);
     }
+=======
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+>>>>>>> cff623d17f221f2c9aa778db9d1b99cdd539ac8a
     
     const allowedOrigins = [
       'http://localhost:3000',
@@ -31,6 +36,7 @@ const corsOptions = {
       'http://127.0.0.1:3001',
       'https://api.emailjs.com',
       'https://vendors.biec.in',
+<<<<<<< HEAD
       'https://www.vendors.biec.in', // Added www variant
       process.env.CLIENT_URL
     ].filter(Boolean); // Remove undefined values
@@ -39,6 +45,12 @@ const corsOptions = {
     
     if (allowedOrigins.includes(origin)) {
       console.log(`Origin ${origin} is allowed`);
+=======
+      process.env.CLIENT_URL
+    ].filter(Boolean); // Remove undefined values
+    
+    if (allowedOrigins.includes(origin)) {
+>>>>>>> cff623d17f221f2c9aa778db9d1b99cdd539ac8a
       callback(null, true);
     } else {
       console.log('CORS request from origin:', origin);
@@ -104,6 +116,7 @@ app.get('/', (req, res) => {
 });
 
 // Error handling middleware
+<<<<<<< HEAD
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   console.log('Request headers:', req.headers);
@@ -118,6 +131,9 @@ app.use((req, res, next) => {
   console.log('Origin:', req.headers.origin);
   next();
 });
+=======
+app.use(errorHandler);
+>>>>>>> cff623d17f221f2c9aa778db9d1b99cdd539ac8a
 
 // Connect to MongoDB
 const PORT = process.env.PORT || 5000;
