@@ -32,6 +32,7 @@ const corsOptions = {
       'https://api.emailjs.com',
       'https://vendors.biec.in',
       'https://www.vendors.biec.in', // Added www variant
+      'https://api.vendors.biec.in', // Added API domain
       process.env.CLIENT_URL
     ].filter(Boolean); // Remove undefined values
     
@@ -61,8 +62,8 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

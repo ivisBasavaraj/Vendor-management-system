@@ -387,7 +387,9 @@ const apiService = {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
-        withCredentials: true
+        withCredentials: true,
+        maxContentLength: 100 * 1024 * 1024, // 100MB
+        maxBodyLength: 100 * 1024 * 1024 // 100MB
       });
     },
     
