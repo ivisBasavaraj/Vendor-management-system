@@ -9,6 +9,7 @@ const User = require('../models/user.model');
 const Notification = require('../models/notification.model');
 const webSocketService = require('../utils/webSocketService');
 const emailService = require('../utils/emailService');
+const mime = require('mime-types');
 
 // Helper function to convert document types to uppercase format
 const convertDocumentType = (frontendType) => {
@@ -637,54 +638,30 @@ exports.downloadFile = async (req, res) => {
     const { filePath, fileName } = req.query;
 
     if (!filePath) {
-      return res.status(400).json({
-        success: false,
-        message: 'File path is required'
-      });
+      return res.status(400).json({ success: false, message: 'File path is required' });
     }
 
-    console.log(`Download request for file path: ${filePath}`);
+    // Sanitize the file path to prevent directory traversal
+    const baseName = path.basename(filePath);
+    const absolutePath = path.join(__dirname, '../uploads', baseName);
 
-    // Process the file path to handle different formats
-    let processedPath = filePath.trim();
-    
-    // Handle Windows absolute paths (C:\path\to\file or D:\path\to\file)
-    if (processedPath.match(/^[A-Z]:[\\\/]/i)) {
-      console.log('Detected Windows absolute path, extracting filename');
-      // Extract just the filename from the Windows path
-      const pathParts = processedPath.split(/[\\\/]/);
-      processedPath = pathParts[pathParts.length - 1];
-      console.log(`Extracted filename: ${processedPath}`);
-    }
-    // Handle Unix-style absolute paths
-    else if (processedPath.startsWith('/')) {
-      console.log('Detected Unix absolute path, extracting filename');
-      // Extract just the filename
-      const pathParts = processedPath.split('/');
-      processedPath = pathParts[pathParts.length - 1];
-      console.log(`Extracted filename: ${processedPath}`);
+    // Security check: ensure the resolved path is still within the uploads directory
+    if (!absolutePath.startsWith(path.join(__dirname, '../uploads')) || !fs.existsSync(absolutePath)) {
+      return res.status(404).json({ success: false, message: 'File not found' });
     }
 
-    // Normalize the path to prevent directory traversal attacks
-    const normalizedPath = path.normalize(processedPath).replace(/^\/+/, '');
-    console.log(`Normalized path: ${normalizedPath}`);
+    // Determine the content type from the file extension
+    const contentType = mime.lookup(absolutePath) || 'application/octet-stream';
+    const downloadFileName = fileName || baseName;
 
-    // Construct the absolute path
-    const absolutePath = path.join(__dirname, '../uploads', normalizedPath);
-    console.log(`Absolute path: ${absolutePath}`);
+    // Set headers for file download
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
 
-    // Check if file exists
-    if (!fs.existsSync(absolutePath)) {
-      console.log(`File not found at: ${absolutePath}`);
-      return res.status(404).json({
-        success: false,
-        message: 'File not found'
-      });
-    }
+    // Stream the file to the response
+    const fileStream = fs.createReadStream(absolutePath);
+    fileStream.pipe(res);
 
-    console.log(`File found, initiating download: ${absolutePath}`);
-    // Download the file
-    res.download(absolutePath, fileName || path.basename(absolutePath));
   } catch (error) {
     console.error('Error downloading file:', error);
     res.status(500).json({
@@ -1341,17 +1318,16 @@ exports.submitForReview = async (req, res) => {
     if (consultant && vendor) {
       try {
         console.log(`Sending document submission notification to consultant: ${consultant.email}`);
-        const emailResult = await emailService.sendDocumentSubmissionNotification(
-          submission, 
-          vendor, 
-          consultant
-        );
-        
-        if (emailResult.success) {
-          console.log('✅ Document submission notification sent successfully');
-        } else {
-          console.log('❌ Failed to send document submission notification:', emailResult.error);
-        }
+        const templateParams = {
+          to_name: consultant.name,
+          to_email: consultant.email,
+          vendor_name: vendor.name,
+          submission_id: submission._id,
+          submission_date: new Date(submission.submissionDate).toLocaleDateString(),
+        };
+
+        await emailService.sendEmail(consultant.email, 'template_ojv7u88', templateParams);
+        console.log('✅ Document submission notification sent successfully');
       } catch (emailError) {
         console.error('Error sending document submission notification:', emailError);
         // Don't fail the submission if email fails
@@ -1437,6 +1413,33 @@ exports.updateDocumentStatus = async (req, res) => {
     
     // Save the updated submission
     await submission.save();
+
+    // Send email notification to the vendor
+    try {
+      const vendor = await User.findById(submission.vendor);
+      if (vendor && vendor.email) {
+        console.log(`[updateDocumentStatus] Preparing to send email to ${vendor.email} for document status: ${status}`);
+        const templateParams = {
+          to_name: vendor.name,
+          to_email: vendor.email,
+          document_name: document.documentName,
+          consultant_name: req.user.name,
+          rejection_reason: remarks || 'Not provided'
+        };
+
+        if (status === 'approved') {
+          console.log(`[updateDocumentStatus] Sending approval email with template: template_ojv7u88`);
+          await emailService.sendEmail(vendor.email, 'template_ojv7u88', templateParams);
+        } else if (status === 'rejected') {
+          console.log(`[updateDocumentStatus] Sending rejection email with template: template_7ngbgsh`);
+          await emailService.sendEmail(vendor.email, 'template_7ngbgsh', templateParams);
+        }
+      } else {
+        console.log(`[updateDocumentStatus] Could not send email. Vendor or vendor email not found. Vendor: ${vendor}`);
+      }
+    } catch (emailError) {
+      console.error('Error sending email notification:', emailError);
+    }
     
     res.status(200).json({
       success: true,

@@ -117,7 +117,7 @@ class EmailService {
    * @param {Object} templateParams - Parameters for the email template
    * @returns {Promise<Object>} - Result of the email sending operation
    */
-  async sendEmail(templateParams) {
+  async sendEmail(to, templateId, templateParams) {
     try {
       // Check if EmailJS is properly initialized
       if (!this.publicKey || !this.privateKey) {
@@ -128,14 +128,16 @@ class EmailService {
       }
 
       console.log('📤 Sending email via EmailJS Node.js SDK...');
-      console.log('📋 Service ID:', this.serviceId);
-      console.log('📋 Template ID:', this.templateId);
-      console.log('📋 Recipient:', templateParams.to_email);
+      console.log('📤 [emailService.sendEmail] Sending email via EmailJS Node.js SDK...');
+      console.log('📋 [emailService.sendEmail] Service ID:', this.serviceId);
+      console.log('📋 [emailService.sendEmail] Template ID:', templateId);
+      console.log('📋 [emailService.sendEmail] Recipient:', to);
+      console.log('📋 [emailService.sendEmail] Template Params:', JSON.stringify(templateParams, null, 2));
 
       // Send email using the official EmailJS Node.js SDK
       const response = await emailjs.send(
         this.serviceId,
-        this.templateId,
+        templateId,
         templateParams,
         {
           publicKey: this.publicKey,

@@ -40,7 +40,7 @@ const corsOptions = {
 };
 
 // Middleware
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions)); // This is now handled by Nginx
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
