@@ -98,21 +98,23 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
         setLoading(true);
         setError(null);
         
-        // Prepare query parameters
+        // Prepare query parameters - always fetch all data for the year
+        // and filter on frontend to ensure we get all documents
         const params: Record<string, any> = {
           year: selectedYear
         };
         
-        if (selectedMonth !== 'All') {
-          // Send month name directly to backend
-          params.month = selectedMonth;
-        }
+        // Don't send month to backend, filter on frontend instead
+        // if (selectedMonth !== 'All') {
+        //   params.month = selectedMonth;
+        // }
         
         console.log('Fetching submissions with filters:', {
           ...params,
           selectedYear,
           selectedMonth,
-          showRejectedOnly
+          showRejectedOnly,
+          note: 'Month filtering will be done on frontend'
         });
         
         if (showRejectedOnly) {
