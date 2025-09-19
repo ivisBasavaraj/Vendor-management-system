@@ -139,21 +139,23 @@ exports.getVendorDashboard = async (req, res) => {
       status: { $in: ['rejected', 'consultant_rejected', 'final_rejected'] }
     });
     
+    // Initialize submission counters (used in both code paths)
+    let resubmittedFromSubmissions = 0;
+
     // If no documents found in Document model, try DocumentSubmission model
     if (totalDocuments === 0) {
       console.log('No documents found in Document model, checking DocumentSubmission model');
-      
+
       // Get submissions for this vendor
       const submissions = await DocumentSubmission.find({ vendor: vendorId });
       console.log(`Found ${submissions.length} document submissions`);
-      
+
       // Count documents from submissions
       let totalFromSubmissions = 0;
       let pendingFromSubmissions = 0;
       let underReviewFromSubmissions = 0;
       let approvedFromSubmissions = 0;
       let rejectedFromSubmissions = 0;
-      let resubmittedFromSubmissions = 0;
       
       submissions.forEach(submission => {
         submission.documents.forEach(doc => {
