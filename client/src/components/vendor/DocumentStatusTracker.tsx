@@ -104,10 +104,7 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
           year: selectedYear
         };
         
-        // Don't send month to backend, filter on frontend instead
-        // if (selectedMonth !== 'All') {
-        //   params.month = selectedMonth;
-        // }
+        // Never send month to backend - filter only on frontend
         
         console.log('Fetching submissions with filters:', {
           ...params,
