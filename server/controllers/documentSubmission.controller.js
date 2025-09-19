@@ -1417,25 +1417,49 @@ exports.updateDocumentStatus = async (req, res) => {
     // Send email notification to the vendor
     try {
       const vendor = await User.findById(submission.vendor);
-      if (vendor && vendor.email) {
+      const consultant = await User.findById(req.user.id);
+      
+      if (vendor && vendor.email && consultant) {
         console.log(`[updateDocumentStatus] Preparing to send email to ${vendor.email} for document status: ${status}`);
-        const templateParams = {
-          to_name: vendor.name,
-          to_email: vendor.email,
-          document_name: document.documentName,
-          consultant_name: req.user.name,
-          rejection_reason: remarks || 'Not provided'
-        };
-
-        if (status === 'approved') {
+        
+        if (status === 'rejected') {
+          console.log(`[updateDocumentStatus] Sending rejection email notification`);
+          
+          // Create document object for rejection email
+          const documentForEmail = {
+            _id: document._id,
+            documentName: document.documentName,
+            documentType: document.documentType,
+            reviewComments: remarks || 'No specific reason provided',
+            reviewDate: Date.now(),
+            status: 'rejected'
+          };
+          
+          // Send rejection notification using the dedicated method
+          const emailResult = await emailService.sendDocumentRejectionNotification(
+            documentForEmail,
+            vendor,
+            consultant
+          );
+          
+          if (emailResult.success) {
+            console.log('✅ Document rejection email sent successfully');
+          } else {
+            console.log('❌ Failed to send document rejection email:', emailResult.error);
+          }
+        } else if (status === 'approved') {
           console.log(`[updateDocumentStatus] Sending approval email with template: template_ojv7u88`);
+          const templateParams = {
+            to_name: vendor.name,
+            to_email: vendor.email,
+            document_name: document.documentName,
+            consultant_name: consultant.name,
+            approval_date: new Date().toLocaleDateString()
+          };
           await emailService.sendEmail(vendor.email, 'template_ojv7u88', templateParams);
-        } else if (status === 'rejected') {
-          console.log(`[updateDocumentStatus] Sending rejection email with template: template_7ngbgsh`);
-          await emailService.sendEmail(vendor.email, 'template_7ngbgsh', templateParams);
         }
       } else {
-        console.log(`[updateDocumentStatus] Could not send email. Vendor or vendor email not found. Vendor: ${vendor}`);
+        console.log(`[updateDocumentStatus] Could not send email. Missing vendor, email, or consultant info`);
       }
     } catch (emailError) {
       console.error('Error sending email notification:', emailError);
@@ -2082,8 +2106,18 @@ exports.getVendorSubmissions = async (req, res) => {
           };
           
           // Add month filtering if specified
-          if (req.query.month && req.query.month !== '' && !isNaN(parseInt(req.query.month))) {
-            const month = parseInt(req.query.month) - 1; // Convert to 0-based month
+          if (req.query.month && req.query.month !== '') {
+            let month;
+            
+            // Handle both numeric and string month inputs
+            if (!isNaN(parseInt(req.query.month))) {
+              month = parseInt(req.query.month) - 1; // Convert to 0-based month
+            } else {
+              // Handle month names (Jan, Feb, etc.)
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              month = monthNames.indexOf(req.query.month);
+            }
             
             // Validate month is reasonable (0-11)
             if (month >= 0 && month <= 11) {

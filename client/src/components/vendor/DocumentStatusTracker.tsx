@@ -104,7 +104,12 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
         };
         
         if (selectedMonth !== 'All') {
-          params.month = selectedMonth;
+          // Convert month name to number for proper filtering
+          const monthMap: { [key: string]: number } = {
+            'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+            'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+          };
+          params.month = monthMap[selectedMonth];
         }
         
         console.log('Fetching submissions with filters:', params);
@@ -356,10 +361,15 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
 
     const documentStatuses = documents.map(doc => doc.status?.toLowerCase() || 'pending');
     
-    // Check if any document is rejected or requires resubmission
+    // Check if any document is resubmitted (takes priority)
+    const hasResubmitted = documentStatuses.some(status => 
+      status === 'resubmitted'
+    );
+    
+    // Check if any document is rejected (but not resubmitted)
     const hasRejected = documentStatuses.some(status => 
       status === 'rejected' || status === 'requires_resubmission'
-    );
+    ) && !hasResubmitted;
     
     // Check if all documents are approved
     const allApproved = documentStatuses.every(status => 
@@ -371,7 +381,9 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       status === 'pending' || status === 'under_review' || status === 'submitted' || status === 'in_progress'
     );
 
-    if (hasRejected) {
+    if (hasResubmitted) {
+      return 'in_progress'; // Resubmitted documents are being processed
+    } else if (hasRejected) {
       return 'pending'; // If any document is rejected, overall status is pending
     } else if (allApproved) {
       return 'approved'; // All documents approved

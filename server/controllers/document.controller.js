@@ -1321,6 +1321,13 @@ exports.updateDocumentStatus = async (req, res) => {
       document.reviewedBy = req.user.id;
       document.reviewDate = Date.now();
     }
+    
+    // If this was a resubmitted document being approved/rejected, clear the resubmission flag
+    if (document.metadata && document.metadata.isResubmission && (status === 'approved' || status === 'rejected')) {
+      document.metadata.isResubmission = false;
+      document.metadata.resubmissionProcessed = true;
+      document.metadata.processedDate = Date.now();
+    }
 
     await document.save();
 
@@ -1393,14 +1400,32 @@ exports.updateDocumentStatus = async (req, res) => {
         const consultant = await User.findById(req.user.id).select('name email');
         
         if (vendor && consultant) {
-          // Send review result email to vendor
-          emailResults = await emailService.sendDocumentReviewEmails(
-            document, 
-            vendor, 
-            consultant, 
-            status, 
-            reviewNotes
-          );
+          if (status === 'rejected') {
+            // Use dedicated rejection email service
+            const documentForEmail = {
+              _id: document._id,
+              documentName: document.title,
+              documentType: document.documentType,
+              reviewComments: reviewNotes || 'No specific reason provided',
+              reviewDate: Date.now(),
+              status: 'rejected'
+            };
+            
+            emailResults = await emailService.sendDocumentRejectionNotification(
+              documentForEmail,
+              vendor,
+              consultant
+            );
+          } else {
+            // Send approval email
+            emailResults = await emailService.sendDocumentReviewEmails(
+              document, 
+              vendor, 
+              consultant, 
+              status, 
+              reviewNotes
+            );
+          }
           
           if (emailResults.success) {
             console.log('Document review email sent successfully');
