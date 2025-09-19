@@ -80,7 +80,9 @@ interface DocumentStatusTrackerProps {
 const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejectedOnly = false }) => {
   // Filter state
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear()); // Default to current year
-  const [selectedMonth, setSelectedMonth] = useState<string>('All'); // Show all months by default
+  // Default to current month abbreviation (e.g., 'Jan')
+  const currentMonthAbbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()];
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthAbbr);
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Data state
@@ -142,10 +144,8 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
               normalizedSubmission.submissionId = normalizedSubmission.submissionId || normalizedSubmission._id || normalizedSubmission.id;
               normalizedSubmission.id = normalizedSubmission._id || normalizedSubmission.id || normalizedSubmission.submissionId;
               
-              // Handle period - prefer uploadPeriod when available
-              if ((normalizedSubmission as any).uploadPeriod?.month && (normalizedSubmission as any).uploadPeriod?.year) {
-                normalizedSubmission.period = `${(normalizedSubmission as any).uploadPeriod.month} ${(normalizedSubmission as any).uploadPeriod.year}`;
-              } else if (!normalizedSubmission.period && normalizedSubmission.month && normalizedSubmission.year) {
+              // Handle period - could be in different formats
+              if (!normalizedSubmission.period && normalizedSubmission.month && normalizedSubmission.year) {
                 normalizedSubmission.period = `${normalizedSubmission.month} ${normalizedSubmission.year}`;
               } else if (!normalizedSubmission.period && normalizedSubmission.submissionPeriod) {
                 normalizedSubmission.period = normalizedSubmission.submissionPeriod;
@@ -335,13 +335,30 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       
       if (!matchesSearch) return false;
     }
+
+    // Always filter by Year using the Period (Month + Year) first
+    let submissionYear: number | null = null;
+    if (submission.period) {
+      const periodParts = submission.period.split(' ');
+      if (periodParts.length >= 2) {
+        const maybeYear = parseInt(periodParts[1], 10);
+        if (!isNaN(maybeYear)) submissionYear = maybeYear;
+      }
+    } else if ((submission as any).uploadPeriod?.year) {
+      const maybeYear = parseInt((submission as any).uploadPeriod.year, 10);
+      if (!isNaN(maybeYear)) submissionYear = maybeYear;
+    } else if (submission.submissionDate) {
+      submissionYear = new Date(submission.submissionDate).getFullYear();
+    }
+
+    if (submissionYear !== selectedYear) return false;
     
-    // Filter by submission month
+    // Filter by submission month (Period month) if a specific month is selected
     if (selectedMonth !== 'All') {
       // Extract month from multiple possible sources
-      let submissionMonth = null;
+      let submissionMonth: string | null = null;
       
-      // Filter by period field (what's displayed to user)
+      // Prefer Period field (what's displayed to user)
       if (submission.period) {
         const periodParts = submission.period.split(' ');
         if (periodParts.length >= 2) {
@@ -379,18 +396,19 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       const normalizedSubmissionMonth = submissionMonth ? monthMap[submissionMonth] : null;
       const normalizedSelectedMonth = monthMap[selectedMonth] || selectedMonth;
       
-      console.log('Month filtering:', {
+      console.log('Month+Year filtering:', {
+        selectedYear,
         selectedMonth,
         submissionMonth,
+        submissionYear,
         normalizedSubmissionMonth,
         normalizedSelectedMonth,
         period: submission.period,
         submissionDate: submission.submissionDate,
-        match: normalizedSubmissionMonth === normalizedSelectedMonth,
-        monthMapKeys: Object.keys(monthMap)
+        match: normalizedSubmissionMonth === normalizedSelectedMonth && submissionYear === selectedYear
       });
       
-      // Only show submissions that match the selected month
+      // Only show submissions that match the selected month within the selected year
       return normalizedSubmissionMonth === normalizedSelectedMonth;
     }
     
