@@ -142,8 +142,10 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
               normalizedSubmission.submissionId = normalizedSubmission.submissionId || normalizedSubmission._id || normalizedSubmission.id;
               normalizedSubmission.id = normalizedSubmission._id || normalizedSubmission.id || normalizedSubmission.submissionId;
               
-              // Handle period - could be in different formats
-              if (!normalizedSubmission.period && normalizedSubmission.month && normalizedSubmission.year) {
+              // Handle period - prefer uploadPeriod when available
+              if ((normalizedSubmission as any).uploadPeriod?.month && (normalizedSubmission as any).uploadPeriod?.year) {
+                normalizedSubmission.period = `${(normalizedSubmission as any).uploadPeriod.month} ${(normalizedSubmission as any).uploadPeriod.year}`;
+              } else if (!normalizedSubmission.period && normalizedSubmission.month && normalizedSubmission.year) {
                 normalizedSubmission.period = `${normalizedSubmission.month} ${normalizedSubmission.year}`;
               } else if (!normalizedSubmission.period && normalizedSubmission.submissionPeriod) {
                 normalizedSubmission.period = normalizedSubmission.submissionPeriod;
