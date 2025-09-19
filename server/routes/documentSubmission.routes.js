@@ -65,7 +65,8 @@ router.post('/:submissionId/documents/:documentId/resubmit', protect, authorize(
 router.get('/mis/data', protect, authorize('admin', 'approver'), documentSubmissionController.getMISData);
 
 // Get vendor status data with document details
-router.get('/vendor-status', protect, authorize('consultant', 'admin', 'approver'), documentSubmissionController.getVendorStatus);
+// Allow vendors to access their own status; controller enforces self-access
+router.get('/vendor-status', protect, authorize('consultant', 'admin', 'approver', 'vendor'), documentSubmissionController.getVendorStatus);
 
 // Get all submissions (admin view)
 router.get('/admin/all', protect, authorize('admin'), documentSubmissionController.getAllSubmissions);

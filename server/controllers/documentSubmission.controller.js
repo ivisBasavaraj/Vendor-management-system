@@ -788,6 +788,14 @@ exports.getVendorStatus = async (req, res) => {
       });
     }
 
+    // Access control: vendors can only view their own status
+    if (req.user && req.user.role === 'vendor' && req.user._id.toString() !== String(vendorId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Vendors can only view their own status.'
+      });
+    }
+
     // Find the vendor and check if active
     const vendor = await User.findById(vendorId);
     if (!vendor) {

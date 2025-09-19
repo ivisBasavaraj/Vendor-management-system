@@ -84,9 +84,9 @@ exports.authorize = (...roles) => {
   return (req, res, next) => {
     // Check if user exists (should have been set by protect middleware)
     if (!req.user) {
-      return res.status(500).json({
+      return res.status(401).json({
         success: false,
-        message: 'Server configuration error: User authentication check failed'
+        message: 'Authentication required. Please log in to access this resource'
       });
     }
 
