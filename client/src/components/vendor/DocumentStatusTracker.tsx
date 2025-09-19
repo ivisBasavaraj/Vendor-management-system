@@ -339,17 +339,22 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
     
     // Filter by submission month
     if (selectedMonth !== 'All') {
-      // Extract month from submission period or submission date
+      // Extract month from multiple possible sources
       let submissionMonth = null;
       
+      // First try period field (what's displayed to user)
       if (submission.period) {
-        // Extract month from period like "Jan 2024" or "January 2024"
         const periodParts = submission.period.split(' ');
         if (periodParts.length >= 2) {
           submissionMonth = periodParts[0];
         }
-      } else if (submission.submissionDate) {
-        // Extract month from submission date
+      }
+      // Then try uploadPeriod.month as fallback
+      else if ((submission as any).uploadPeriod?.month) {
+        submissionMonth = (submission as any).uploadPeriod.month;
+      }
+      // Finally try submission date
+      else if (submission.submissionDate) {
         const date = new Date(submission.submissionDate);
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
