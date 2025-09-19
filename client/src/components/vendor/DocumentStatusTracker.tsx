@@ -335,7 +335,28 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       if (!matchesSearch) return false;
     }
     
-    // Server-side filtering is now working properly, no need for client-side backup
+    // Filter by submission month
+    if (selectedMonth !== 'All') {
+      // Extract month from submission period or submission date
+      let submissionMonth = null;
+      
+      if (submission.period) {
+        // Extract month from period like "Jan 2024" or "January 2024"
+        const periodParts = submission.period.split(' ');
+        if (periodParts.length >= 2) {
+          submissionMonth = periodParts[0];
+        }
+      } else if (submission.submissionDate) {
+        // Extract month from submission date
+        const date = new Date(submission.submissionDate);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        submissionMonth = monthNames[date.getMonth()];
+      }
+      
+      // Only show submissions that match the selected month
+      return submissionMonth === selectedMonth;
+    }
     
     return true;
   }) : [];
