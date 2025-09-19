@@ -387,7 +387,8 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
         normalizedSelectedMonth,
         period: submission.period,
         submissionDate: submission.submissionDate,
-        match: normalizedSubmissionMonth === normalizedSelectedMonth
+        match: normalizedSubmissionMonth === normalizedSelectedMonth,
+        monthMapKeys: Object.keys(monthMap)
       });
       
       // Only show submissions that match the selected month
