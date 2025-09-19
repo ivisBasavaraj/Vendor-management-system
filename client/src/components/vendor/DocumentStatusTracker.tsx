@@ -354,8 +354,27 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
         submissionMonth = monthNames[date.getMonth()];
       }
       
+      // Normalize month names for comparison
+      const monthMap: { [key: string]: string } = {
+        'Jan': 'Jan', 'January': 'Jan',
+        'Feb': 'Feb', 'February': 'Feb', 
+        'Mar': 'Mar', 'March': 'Mar',
+        'Apr': 'Apr', 'April': 'Apr',
+        'May': 'May',
+        'Jun': 'Jun', 'June': 'Jun',
+        'Jul': 'Jul', 'July': 'Jul',
+        'Aug': 'Aug', 'August': 'Aug',
+        'Sep': 'Sep', 'September': 'Sep',
+        'Oct': 'Oct', 'October': 'Oct',
+        'Nov': 'Nov', 'November': 'Nov',
+        'Dec': 'Dec', 'December': 'Dec'
+      };
+      
+      const normalizedSubmissionMonth = submissionMonth ? monthMap[submissionMonth] : null;
+      const normalizedSelectedMonth = monthMap[selectedMonth] || selectedMonth;
+      
       // Only show submissions that match the selected month
-      return submissionMonth === selectedMonth;
+      return normalizedSubmissionMonth === normalizedSelectedMonth;
     }
     
     return true;
