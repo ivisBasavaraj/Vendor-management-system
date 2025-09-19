@@ -1414,6 +1414,39 @@ exports.updateDocumentStatus = async (req, res) => {
     // Save the updated submission
     await submission.save();
 
+    // Create notification for vendor about document status change
+    try {
+      const notificationType = status === 'approved' ? 'document_approved' : 'document_rejected';
+      const notificationTitle = status === 'approved' ? 'Document Approved' : 'Document Rejected';
+      const notificationMessage = `Your ${document.documentType} has been ${status}${remarks ? '. Remarks: ' + remarks : ''}`;
+      
+      await Notification.create({
+        recipient: submission.vendor,
+        sender: req.user.id,
+        type: notificationType,
+        title: notificationTitle,
+        message: notificationMessage,
+        relatedDocument: submission._id,
+        priority: status === 'rejected' ? 'high' : 'medium'
+      });
+      
+      // Send real-time notification via WebSocket
+      webSocketService.sendToUser(submission.vendor.toString(), 'notification', {
+        type: 'notification',
+        data: {
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          timestamp: new Date().toISOString(),
+          priority: status === 'rejected' ? 'high' : 'medium'
+        }
+      });
+      
+      console.log(`✅ Notification created for vendor: ${notificationTitle}`);
+    } catch (notificationError) {
+      console.error('Error creating notification:', notificationError);
+    }
+
     // Send email notification to the vendor
     try {
       const vendor = await User.findById(submission.vendor);
@@ -1436,11 +1469,18 @@ exports.updateDocumentStatus = async (req, res) => {
           };
           
           // Send rejection notification using the dedicated method
+          console.log('📧 Calling emailService.sendDocumentRejectionNotification...');
+          console.log('📧 Document for email:', JSON.stringify(documentForEmail, null, 2));
+          console.log('📧 Vendor email:', vendor.email);
+          console.log('📧 Consultant name:', consultant.name);
+          
           const emailResult = await emailService.sendDocumentRejectionNotification(
             documentForEmail,
             vendor,
             consultant
           );
+          
+          console.log('📧 Email service result:', JSON.stringify(emailResult, null, 2));
           
           if (emailResult.success) {
             console.log('✅ Document rejection email sent successfully');
@@ -1460,6 +1500,7 @@ exports.updateDocumentStatus = async (req, res) => {
         }
       } else {
         console.log(`[updateDocumentStatus] Could not send email. Missing vendor, email, or consultant info`);
+        console.log(`[updateDocumentStatus] Debug - vendor: ${vendor ? 'found' : 'not found'}, email: ${vendor?.email || 'none'}, consultant: ${consultant ? 'found' : 'not found'}`);
       }
     } catch (emailError) {
       console.error('Error sending email notification:', emailError);
@@ -1849,6 +1890,7 @@ exports.reviewDocument = async (req, res) => {
           }
         } else {
           console.log('⚠️ Could not find vendor or consultant for email notification');
+          console.log(`Debug - vendor: ${vendor ? 'found' : 'not found'}, consultant: ${consultant ? 'found' : 'not found'}`);
         }
       } catch (emailError) {
         console.error('Error sending document rejection email:', emailError);
@@ -2089,49 +2131,38 @@ exports.getVendorSubmissions = async (req, res) => {
       }
     }
     
-    // Add date filtering
+    // Add date filtering using uploadPeriod
     if (req.query.year && !isNaN(parseInt(req.query.year))) {
       const year = parseInt(req.query.year);
       
       // Validate year is reasonable
       if (year >= 2020 && year <= 2040) {
-        const startDate = new Date(year, 0, 1); // January 1st of the year
-        const endDate = new Date(year + 1, 0, 1); // January 1st of next year
+        query['uploadPeriod.year'] = year;
         
-        // Validate dates are valid
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          query.createdAt = {
-            $gte: startDate,
-            $lt: endDate
-          };
+        // Add month filtering if specified
+        if (req.query.month && req.query.month !== '' && req.query.month !== 'All') {
+          let monthValue;
           
-          // Add month filtering if specified
-          if (req.query.month && req.query.month !== '') {
-            let month;
-            
-            // Handle both numeric and string month inputs
-            if (!isNaN(parseInt(req.query.month))) {
-              month = parseInt(req.query.month) - 1; // Convert to 0-based month
-            } else {
-              // Handle month names (Jan, Feb, etc.)
-              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-              month = monthNames.indexOf(req.query.month);
+          // Handle both numeric and string month inputs
+          if (!isNaN(parseInt(req.query.month))) {
+            // Convert numeric month (1-12) to month name
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const monthIndex = parseInt(req.query.month) - 1;
+            if (monthIndex >= 0 && monthIndex <= 11) {
+              monthValue = monthNames[monthIndex];
             }
-            
-            // Validate month is reasonable (0-11)
-            if (month >= 0 && month <= 11) {
-              const monthStartDate = new Date(year, month, 1);
-              const monthEndDate = new Date(year, month + 1, 1);
-              
-              // Validate month dates are valid
-              if (!isNaN(monthStartDate.getTime()) && !isNaN(monthEndDate.getTime())) {
-                query.createdAt = {
-                  $gte: monthStartDate,
-                  $lt: monthEndDate
-                };
-              }
+          } else {
+            // Handle month names (Jan, Feb, etc.)
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            if (monthNames.includes(req.query.month)) {
+              monthValue = req.query.month;
             }
+          }
+          
+          if (monthValue) {
+            query['uploadPeriod.month'] = monthValue;
           }
         }
       }

@@ -153,6 +153,7 @@ exports.getVendorDashboard = async (req, res) => {
       let underReviewFromSubmissions = 0;
       let approvedFromSubmissions = 0;
       let rejectedFromSubmissions = 0;
+      let resubmittedFromSubmissions = 0;
       
       submissions.forEach(submission => {
         submission.documents.forEach(doc => {
@@ -170,6 +171,9 @@ exports.getVendorDashboard = async (req, res) => {
               break;
             case 'rejected':
               rejectedFromSubmissions++;
+              break;
+            case 'resubmitted':
+              resubmittedFromSubmissions++;
               break;
           }
         });
@@ -269,6 +273,9 @@ exports.getVendorDashboard = async (req, res) => {
       if (rejectedDocuments > 0) {
         documentsByStatus.push({ name: 'Rejected', value: rejectedDocuments });
       }
+      if (resubmittedFromSubmissions > 0) {
+        documentsByStatus.push({ name: 'Resubmitted', value: resubmittedFromSubmissions });
+      }
     }
     
     res.status(200).json({
@@ -279,7 +286,8 @@ exports.getVendorDashboard = async (req, res) => {
           pendingDocuments,
           underReviewDocuments,
           approvedDocuments,
-          rejectedDocuments
+          rejectedDocuments,
+          resubmittedDocuments: resubmittedFromSubmissions || 0
         },
         recentDocuments,
         documentsByStatus,

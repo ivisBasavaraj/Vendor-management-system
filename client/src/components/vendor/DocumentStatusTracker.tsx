@@ -79,7 +79,7 @@ interface DocumentStatusTrackerProps {
 
 const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejectedOnly = false }) => {
   // Filter state
-  const [selectedYear, setSelectedYear] = useState<number>(2025); // Default to 2025 for testing
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear()); // Default to current year
   const [selectedMonth, setSelectedMonth] = useState<string>('All'); // Show all months by default
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -104,15 +104,16 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
         };
         
         if (selectedMonth !== 'All') {
-          // Convert month name to number for proper filtering
-          const monthMap: { [key: string]: number } = {
-            'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-            'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
-          };
-          params.month = monthMap[selectedMonth];
+          // Send month name directly to backend
+          params.month = selectedMonth;
         }
         
-        console.log('Fetching submissions with filters:', params);
+        console.log('Fetching submissions with filters:', {
+          ...params,
+          selectedYear,
+          selectedMonth,
+          showRejectedOnly
+        });
         
         if (showRejectedOnly) {
           params.status = 'rejected,requires_resubmission';
@@ -334,21 +335,7 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       if (!matchesSearch) return false;
     }
     
-    // Apply date filtering as backup (in case API filtering doesn't work properly)
-    if (selectedYear && submission.submissionDate) {
-      const submissionDate = new Date(submission.submissionDate);
-      const submissionYear = submissionDate.getFullYear();
-      
-      if (submissionYear !== selectedYear) return false;
-      
-      if (selectedMonth && selectedMonth !== 'All') {
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const submissionMonth = monthNames[submissionDate.getMonth()];
-        
-        if (submissionMonth !== selectedMonth) return false;
-      }
-    }
+    // Server-side filtering is now working properly, no need for client-side backup
     
     return true;
   }) : [];
@@ -521,7 +508,7 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
               variant="outline"
               leftIcon={<FunnelIcon className="h-5 w-5" />}
               onClick={() => {
-                setSelectedYear(2025); // Reset to 2025 for testing
+                setSelectedYear(new Date().getFullYear()); // Reset to current year
                 setSelectedMonth('All'); // Show all months
                 setSearchQuery('');
               }}
