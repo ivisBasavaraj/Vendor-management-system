@@ -820,7 +820,10 @@ exports.getVendorStatus = async (req, res) => {
     let normalizedMonth = null;
     let periodStartDate = null;
     let periodEndDate = null;
-    if (year && month) {
+
+    const isAllTime = month && String(month).toLowerCase().replace(/\s+/g, '-') === 'all-time';
+
+    if (year && month && !isAllTime) {
       const monthMap = {
         'january': 'Jan', 'jan': 'Jan', '1': 'Jan', '01': 'Jan',
         'february': 'Feb', 'feb': 'Feb', '2': 'Feb', '02': 'Feb',
@@ -836,20 +839,23 @@ exports.getVendorStatus = async (req, res) => {
         'december': 'Dec', 'dec': 'Dec', '12': 'Dec'
       };
       const monthKey = String(month).toLowerCase();
-      normalizedMonth = monthMap[monthKey] || month; // fallback to provided value
+      normalizedMonth = monthMap[monthKey] || null; // only accept known months
 
-      submissionQuery['uploadPeriod.year'] = parseInt(year);
-      submissionQuery['uploadPeriod.month'] = normalizedMonth;
+      // Only apply year/month filters when month is recognized
+      if (normalizedMonth) {
+        submissionQuery['uploadPeriod.year'] = parseInt(year);
+        submissionQuery['uploadPeriod.month'] = normalizedMonth;
 
-      // Compute period date range for legacy Document filtering later
-      const monthIndex = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      }[normalizedMonth];
-      if (monthIndex !== undefined) {
-        const y = parseInt(year);
-        periodStartDate = new Date(Date.UTC(y, monthIndex, 1, 0, 0, 0));
-        periodEndDate = new Date(Date.UTC(y, monthIndex + 1, 1, 0, 0, 0));
+        // Compute period date range for legacy Document filtering later
+        const monthIndex = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        }[normalizedMonth];
+        if (monthIndex !== undefined) {
+          const y = parseInt(year);
+          periodStartDate = new Date(Date.UTC(y, monthIndex, 1, 0, 0, 0));
+          periodEndDate = new Date(Date.UTC(y, monthIndex + 1, 1, 0, 0, 0));
+        }
       }
     }
 
