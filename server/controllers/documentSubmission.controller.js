@@ -864,7 +864,7 @@ exports.getVendorStatus = async (req, res) => {
 
     // Also check the Document model for any legacy documents
     const Document = require('../models/document.model');
-    const legacyQuery = { vendor: mongoose.Types.ObjectId(vendorId) };
+    const legacyQuery = { vendor: new mongoose.Types.ObjectId(vendorId) };
     if (periodStartDate && periodEndDate) {
       legacyQuery.submissionDate = { $gte: periodStartDate, $lt: periodEndDate };
     }
