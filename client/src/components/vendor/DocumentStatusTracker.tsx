@@ -225,7 +225,7 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
     };
     
     fetchSubmissions();
-  }, [selectedYear, selectedMonth, showRejectedOnly]);
+  }, [selectedYear, showRejectedOnly]);
   
   // Toggle expanded submission
   const toggleExpand = (submissionId: string) => {
