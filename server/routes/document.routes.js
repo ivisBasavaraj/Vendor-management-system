@@ -170,34 +170,8 @@ router.get('/status/:status', protect, async (req, res) => {
     });
   }
 });
-router.get('/vendor-status', protect, (req, res) => {
-  // Handle vendor status request
-  const { vendorId, year, month } = req.query;
-  
-  if (!vendorId || !year || !month) {
-    return res.status(400).json({
-      success: false,
-      message: 'Missing required parameters: vendorId, year, and month are required'
-    });
-  }
-  
-  // Return mock data for now
-  return res.status(200).json({
-    success: true,
-    data: {
-      vendorId,
-      vendorName: 'Vendor Name',
-      vendorCompany: 'Vendor Company',
-      year: parseInt(year),
-      month,
-      totalDocuments: 20,
-      approvedDocuments: 15,
-      rejectedDocuments: 2,
-      pendingDocuments: 3,
-      complianceScore: 75
-    }
-  });
-});
+// DEPRECATED: vendor-status mock removed to avoid confusion with real endpoint at /api/document-submissions/vendor-status
+// If needed for local manual testing, reintroduce under a different path such as /debug/vendor-status-mock
 router.get('/:id', protect, getDocument);
 // Update document status - try both standalone documents and embedded documents in submissions
 router.put('/:id/status', protect, authorize('admin', 'consultant'), async (req, res) => {

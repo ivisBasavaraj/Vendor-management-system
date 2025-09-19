@@ -780,6 +780,14 @@ exports.getVendorStatus = async (req, res) => {
       });
     }
 
+    // Validate vendorId format to avoid ObjectId cast errors
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid vendorId format'
+      });
+    }
+
     // Find the vendor and check if active
     const vendor = await User.findById(vendorId);
     if (!vendor) {
@@ -873,7 +881,8 @@ exports.getVendorStatus = async (req, res) => {
     
     // Process DocumentSubmission documents
     submissions.forEach(submission => {
-      submission.documents.forEach(doc => {
+      const docs = Array.isArray(submission.documents) ? submission.documents : [];
+      docs.forEach(doc => {
         allDocuments.push({
           id: doc._id,
           submissionId: submission._id,
