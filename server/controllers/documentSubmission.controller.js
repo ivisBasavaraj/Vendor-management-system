@@ -863,12 +863,18 @@ exports.getVendorStatus = async (req, res) => {
     const submissions = await DocumentSubmission.find(submissionQuery);
 
     // Also check the Document model for any legacy documents
-    const Document = require('../models/document.model');
-    const legacyQuery = { vendor: new mongoose.Types.ObjectId(vendorId) };
-    if (periodStartDate && periodEndDate) {
-      legacyQuery.submissionDate = { $gte: periodStartDate, $lt: periodEndDate };
+    let legacyDocuments = [];
+    try {
+      const Document = require('../models/document.model');
+      const legacyQuery = { vendor: new mongoose.Types.ObjectId(vendorId) };
+      if (periodStartDate && periodEndDate) {
+        legacyQuery.submissionDate = { $gte: periodStartDate, $lt: periodEndDate };
+      }
+      legacyDocuments = await Document.find(legacyQuery);
+    } catch (legacyError) {
+      console.log('Legacy document query failed, continuing without legacy documents:', legacyError.message);
+      legacyDocuments = [];
     }
-    const legacyDocuments = await Document.find(legacyQuery);
 
     // If no submissions and no legacy documents found, return empty data
     if (submissions.length === 0 && legacyDocuments.length === 0) {
@@ -1001,7 +1007,7 @@ exports.getVendorStatus = async (req, res) => {
             Math.max(...submissions.map(s => new Date(s.lastModifiedDate || s.createdAt).getTime())) :
             (legacyDocuments.length > 0 ? 
               Math.max(...legacyDocuments.map(d => new Date(d.updatedAt || d.createdAt).getTime())) :
-              new Date(vendor.createdAt).getTime())
+              new Date(vendor.createdAt || new Date()).getTime())
         }
       }
     });
