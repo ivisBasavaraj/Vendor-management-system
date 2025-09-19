@@ -342,16 +342,16 @@ const DocumentStatusTracker: React.FC<DocumentStatusTrackerProps> = ({ showRejec
       // Extract month from multiple possible sources
       let submissionMonth = null;
       
-      // Use uploadPeriod.month since that's what backend filters by
-      if ((submission as any).uploadPeriod?.month) {
-        submissionMonth = (submission as any).uploadPeriod.month;
-      }
-      // Fallback to period field
-      else if (submission.period) {
+      // Filter by period field (what's displayed to user)
+      if (submission.period) {
         const periodParts = submission.period.split(' ');
         if (periodParts.length >= 2) {
           submissionMonth = periodParts[0];
         }
+      }
+      // Fallback to uploadPeriod.month
+      else if ((submission as any).uploadPeriod?.month) {
+        submissionMonth = (submission as any).uploadPeriod.month;
       }
       // Finally try submission date
       else if (submission.submissionDate) {
