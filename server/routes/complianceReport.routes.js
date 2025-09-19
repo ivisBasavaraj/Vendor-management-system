@@ -550,11 +550,49 @@ router.get('/:reportId/attachments/:attachmentId/view', protect, async (req, res
 async function fetchVendorDocumentHistory(vendorId, year, month) {
   try {
     const documentHistory = [];
-    
-    // Get documents from the legacy documents collection
-    const documents = await Document.find({ vendorId: new ObjectId(vendorId) })
+
+    // Normalize month to short enum if provided (Jan, Feb, ...)
+    let normalizedMonth = null;
+    let periodStartDate = null;
+    let periodEndDate = null;
+    if (year && month) {
+      const monthMap = {
+        'january': 'Jan', 'jan': 'Jan', '1': 'Jan', '01': 'Jan',
+        'february': 'Feb', 'feb': 'Feb', '2': 'Feb', '02': 'Feb',
+        'march': 'Mar', 'mar': 'Mar', '3': 'Mar', '03': 'Mar',
+        'april': 'Apr', 'apr': 'Apr', '4': 'Apr', '04': 'Apr',
+        'may': 'May', '5': 'May', '05': 'May',
+        'june': 'Jun', 'jun': 'Jun', '6': 'Jun', '06': 'Jun',
+        'july': 'Jul', 'jul': 'Jul', '7': 'Jul', '07': 'Jul',
+        'august': 'Aug', 'aug': 'Aug', '8': 'Aug', '08': 'Aug',
+        'september': 'Sep', 'sep': 'Sep', '9': 'Sep', '09': 'Sep',
+        'october': 'Oct', 'oct': 'Oct', '10': 'Oct',
+        'november': 'Nov', 'nov': 'Nov', '11': 'Nov',
+        'december': 'Dec', 'dec': 'Dec', '12': 'Dec'
+      };
+      const monthKey = String(month).toLowerCase();
+      normalizedMonth = monthMap[monthKey] || month;
+
+      // Compute period date range for legacy Document filtering
+      const monthIndex = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      }[normalizedMonth];
+      if (monthIndex !== undefined) {
+        const y = parseInt(year);
+        periodStartDate = new Date(Date.UTC(y, monthIndex, 1, 0, 0, 0));
+        periodEndDate = new Date(Date.UTC(y, monthIndex + 1, 1, 0, 0, 0));
+      }
+    }
+
+    // Query legacy Document collection (uses vendor and submissionDate)
+    const legacyQuery = { vendor: new ObjectId(vendorId) };
+    if (periodStartDate && periodEndDate) {
+      legacyQuery.submissionDate = { $gte: periodStartDate, $lt: periodEndDate };
+    }
+    const documents = await Document.find(legacyQuery)
       .sort({ createdAt: -1 })
-      .limit(50); // Limit to recent documents
+      .limit(100);
 
     documents.forEach(doc => {
       documentHistory.push({
@@ -562,18 +600,20 @@ async function fetchVendorDocumentHistory(vendorId, year, month) {
         documentName: doc.title || doc.name,
         documentType: doc.documentType || 'Unknown',
         status: doc.status,
-        submissionDate: doc.createdAt,
-        reviewDate: doc.updatedAt,
+        submissionDate: doc.submissionDate || doc.createdAt,
+        reviewDate: doc.reviewDate || doc.updatedAt,
         reviewNotes: doc.reviewNotes || ''
       });
     });
 
-    // Get documents from the document submissions collection
-    const submissions = await DocumentSubmission.find({ 
-      'vendor._id': new ObjectId(vendorId) 
-    })
+    // Query DocumentSubmission collection (uses vendor ObjectId and uploadPeriod)
+    const submissionQuery = { vendor: new ObjectId(vendorId) };
+    if (year) submissionQuery['uploadPeriod.year'] = parseInt(year);
+    if (normalizedMonth) submissionQuery['uploadPeriod.month'] = normalizedMonth;
+
+    const submissions = await DocumentSubmission.find(submissionQuery)
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(100);
 
     submissions.forEach(submission => {
       if (submission.documents && submission.documents.length > 0) {
@@ -584,7 +624,7 @@ async function fetchVendorDocumentHistory(vendorId, year, month) {
             documentType: doc.documentType,
             status: doc.status,
             submissionDate: submission.createdAt,
-            reviewDate: doc.updatedAt || submission.updatedAt,
+            reviewDate: doc.reviewDate || submission.updatedAt,
             reviewNotes: doc.reviewNotes || ''
           });
         });

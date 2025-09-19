@@ -799,11 +799,42 @@ exports.getVendorStatus = async (req, res) => {
 
     // Build query for submissions
     let submissionQuery = { vendor: vendorId };
-    
-    // If year and month are provided, filter by them
+
+    // Normalize incoming month to short enum used in schema ('Jan', 'Feb', ...)
+    let normalizedMonth = null;
+    let periodStartDate = null;
+    let periodEndDate = null;
     if (year && month) {
+      const monthMap = {
+        'january': 'Jan', 'jan': 'Jan', '1': 'Jan', '01': 'Jan',
+        'february': 'Feb', 'feb': 'Feb', '2': 'Feb', '02': 'Feb',
+        'march': 'Mar', 'mar': 'Mar', '3': 'Mar', '03': 'Mar',
+        'april': 'Apr', 'apr': 'Apr', '4': 'Apr', '04': 'Apr',
+        'may': 'May', '5': 'May', '05': 'May',
+        'june': 'Jun', 'jun': 'Jun', '6': 'Jun', '06': 'Jun',
+        'july': 'Jul', 'jul': 'Jul', '7': 'Jul', '07': 'Jul',
+        'august': 'Aug', 'aug': 'Aug', '8': 'Aug', '08': 'Aug',
+        'september': 'Sep', 'sep': 'Sep', '9': 'Sep', '09': 'Sep',
+        'october': 'Oct', 'oct': 'Oct', '10': 'Oct',
+        'november': 'Nov', 'nov': 'Nov', '11': 'Nov',
+        'december': 'Dec', 'dec': 'Dec', '12': 'Dec'
+      };
+      const monthKey = String(month).toLowerCase();
+      normalizedMonth = monthMap[monthKey] || month; // fallback to provided value
+
       submissionQuery['uploadPeriod.year'] = parseInt(year);
-      submissionQuery['uploadPeriod.month'] = month;
+      submissionQuery['uploadPeriod.month'] = normalizedMonth;
+
+      // Compute period date range for legacy Document filtering later
+      const monthIndex = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      }[normalizedMonth];
+      if (monthIndex !== undefined) {
+        const y = parseInt(year);
+        periodStartDate = new Date(Date.UTC(y, monthIndex, 1, 0, 0, 0));
+        periodEndDate = new Date(Date.UTC(y, monthIndex + 1, 1, 0, 0, 0));
+      }
     }
 
     // Find all submissions for this vendor (all time or specific period)
@@ -811,7 +842,11 @@ exports.getVendorStatus = async (req, res) => {
 
     // Also check the Document model for any legacy documents
     const Document = require('../models/document.model');
-    const legacyDocuments = await Document.find({ vendor: vendorId });
+    const legacyQuery = { vendor: mongoose.Types.ObjectId(vendorId) };
+    if (periodStartDate && periodEndDate) {
+      legacyQuery.submissionDate = { $gte: periodStartDate, $lt: periodEndDate };
+    }
+    const legacyDocuments = await Document.find(legacyQuery);
 
     // If no submissions and no legacy documents found, return empty data
     if (submissions.length === 0 && legacyDocuments.length === 0) {
@@ -889,7 +924,8 @@ exports.getVendorStatus = async (req, res) => {
     const pendingDocuments = allDocuments.filter(doc => 
       doc.status === 'uploaded' || 
       doc.status === 'under_review' || 
-      doc.status === 'pending'
+      doc.status === 'pending' ||
+      doc.status === 'resubmitted'
     ).length;
 
     // Calculate compliance score
@@ -2949,40 +2985,76 @@ exports.updateIndividualDocumentStatus = async (req, res) => {
     submission.documents[docIndex].status = status;
     submission.documents[docIndex].reviewDate = Date.now();
     submission.documents[docIndex].reviewedBy = req.user.id;
-    
+
     if (reviewNotes) {
       submission.documents[docIndex].consultantRemarks = reviewNotes;
     }
-    
-    // Update submission status based on document statuses
+
+    // If rejected, push/mark in rejectedDocuments tracking
+    if (status === 'rejected') {
+      submission.rejectedDocuments.push({
+        documentType: submission.documents[docIndex].documentType,
+        rejectionReason: reviewNotes || 'Document rejected',
+        rejectedDate: new Date(),
+        rejectedBy: req.user.id,
+        isResubmitted: false
+      });
+    }
+
+    // Update submission status based on document statuses (ignore previously rejected if now resubmitted/approved)
     const documentStatuses = submission.documents.map(doc => doc.status);
     const hasRejected = documentStatuses.includes('rejected');
     const hasResubmitted = documentStatuses.includes('resubmitted');
     const hasPending = documentStatuses.includes('uploaded') || documentStatuses.includes('pending');
     const hasUnderReview = documentStatuses.includes('under_review');
-    const allApproved = documentStatuses.every(status => status === 'approved');
-    
+    const allApproved = submission.documents
+      .filter(doc => doc.isMandatory) // consider mandatory docs for overall approval
+      .every(doc => doc.status === 'approved');
+
     if (allApproved) {
       submission.submissionStatus = 'fully_approved';
       submission.finalApprovedBy = req.user.id;
       submission.finalApprovedDate = Date.now();
-    } else if (hasRejected || hasResubmitted) {
+    } else if (hasRejected) {
       submission.submissionStatus = 'requires_resubmission';
-    } else if (hasUnderReview) {
+    } else if (hasResubmitted || hasUnderReview) {
       submission.submissionStatus = 'under_review';
     } else if (hasPending) {
       submission.submissionStatus = 'submitted';
     } else {
       submission.submissionStatus = 'partially_approved';
     }
-    
+
     submission.lastModifiedDate = Date.now();
-    
+
+    // Create vendor notification and email on rejection or approval
+    try {
+      const vendorUser = await User.findById(submission.vendor);
+      if (vendorUser && vendorUser.email) {
+        if (status === 'rejected') {
+          await emailService.sendDocumentRejectionNotification(
+            {
+              _id: submission.documents[docIndex]._id,
+              documentName: submission.documents[docIndex].documentName,
+              documentType: submission.documents[docIndex].documentType,
+              reviewComments: reviewNotes || 'Document rejected',
+              reviewDate: new Date(),
+              status: 'rejected'
+            },
+            vendorUser,
+            req.user
+          );
+        }
+      }
+    } catch (notifyErr) {
+      console.error('Post-update email/notification error:', notifyErr);
+    }
+
     // Save the submission
     await submission.save();
-    
+
     console.log(`Document ${docId} status updated to ${status}, submission status: ${submission.submissionStatus}`);
-    
+
     return res.status(200).json({
       success: true,
       message: 'Document status updated successfully',
