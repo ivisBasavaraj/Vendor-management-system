@@ -282,9 +282,9 @@ exports.getVendorDashboard = async (req, res) => {
     
     // Get rejected documents details
     const rejectedDocumentsList = [];
-    const submissions = await DocumentSubmission.find({ vendor: vendorId });
+    const rejectedSubmissions = await DocumentSubmission.find({ vendor: vendorId });
     
-    submissions.forEach(submission => {
+    rejectedSubmissions.forEach(submission => {
       submission.documents.forEach(doc => {
         if (doc.status === 'rejected' || doc.consultantStatus === 'rejected') {
           rejectedDocumentsList.push({
@@ -305,7 +305,7 @@ exports.getVendorDashboard = async (req, res) => {
     
     // Calculate submission stats
     const submissionStats = {
-      totalSubmissions: submissions.length,
+      totalSubmissions: rejectedSubmissions.length,
       draft: 0,
       submitted: 0,
       underReview: 0,
@@ -314,7 +314,7 @@ exports.getVendorDashboard = async (req, res) => {
       requiresResubmission: 0
     };
     
-    submissions.forEach(submission => {
+    rejectedSubmissions.forEach(submission => {
       switch (submission.status) {
         case 'draft':
           submissionStats.draft++;
@@ -338,7 +338,7 @@ exports.getVendorDashboard = async (req, res) => {
     });
     
     // Get current submission if exists
-    const currentSubmission = submissions.find(sub => 
+    const currentSubmission = rejectedSubmissions.find(sub => 
       (sub.year === currentYear || !sub.year) && 
       (sub.month === currentMonth || !sub.month)
     );
@@ -354,7 +354,7 @@ exports.getVendorDashboard = async (req, res) => {
       currentSubmission.status === 'requires_resubmission' ? 1 : 0);
     
     // Get submission history
-    const submissionHistory = submissions.map(sub => ({
+    const submissionHistory = rejectedSubmissions.map(sub => ({
       _id: {
         year: sub.year || currentYear,
         month: sub.month || currentMonth
@@ -396,8 +396,8 @@ exports.getVendorDashboard = async (req, res) => {
           currentPeriodCompliant,
           overallComplianceRate: complianceRate,
           pendingActions,
-          lastSubmissionDate: submissions.length > 0 ? 
-            submissions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0].createdAt :
+          lastSubmissionDate: rejectedSubmissions.length > 0 ? 
+            rejectedSubmissions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0].createdAt :
             null
         },
         recentNotifications: [],
