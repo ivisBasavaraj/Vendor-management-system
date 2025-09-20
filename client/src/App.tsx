@@ -5,6 +5,7 @@ import { WebSocketProvider } from './contexts/WebSocketContext';
 import { NotificationPopupProvider } from './contexts/NotificationPopupContext';
 import { motion } from 'framer-motion';
 import clientEmailService from './utils/emailService';
+import { enableNotifications } from './utils/notificationHelper';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
@@ -702,6 +703,9 @@ const App: React.FC = () => {
   useEffect(() => {
     // Initialize EmailJS when the app starts
     clientEmailService.init();
+    
+    // Enable notifications
+    enableNotifications();
     
     // Test configuration in development mode
     if (process.env.NODE_ENV === 'development') {
