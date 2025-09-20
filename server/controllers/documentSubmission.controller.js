@@ -1481,11 +1481,14 @@ exports.updateDocumentStatus = async (req, res) => {
 
     // Create notification for vendor about document status change
     try {
+      const vendor = await User.findById(submission.vendor);
+      const consultant = await User.findById(req.user.id);
+      
       const notificationType = status === 'approved' ? 'document_approved' : 'document_rejected';
       const notificationTitle = status === 'approved' ? 'Document Approved' : 'Document Rejected';
-      const notificationMessage = `Your document "${document.documentName}" (${document.documentType}) has been ${status}${remarks ? '. Remarks: ' + remarks : ''}`;
+      const notificationMessage = `Your document "${document.documentName}" (${document.documentType}) has been ${status} by ${consultant?.name || 'Consultant'}${remarks ? '. Remarks: ' + remarks : ''}`;
       
-      await Notification.create({
+      const notification = await Notification.create({
         recipient: submission.vendor,
         sender: req.user.id,
         type: notificationType,
@@ -1502,12 +1505,15 @@ exports.updateDocumentStatus = async (req, res) => {
           type: notificationType,
           title: notificationTitle,
           message: notificationMessage,
+          documentName: document.documentName,
+          documentType: document.documentType,
+          consultantName: consultant?.name || 'Consultant',
           timestamp: new Date().toISOString(),
           priority: status === 'rejected' ? 'high' : 'medium'
         }
       });
       
-      console.log(`✅ Notification created for vendor: ${notificationTitle}`);
+      console.log(`✅ Notification sent to ${vendor?.name}: "${document.documentName}" ${status}`);
     } catch (notificationError) {
       console.error('Error creating notification:', notificationError);
     }
@@ -1964,14 +1970,43 @@ exports.reviewDocument = async (req, res) => {
     }
 
     // Create notification for vendor about document review
-    await createDocumentReviewNotification(
-      submission, 
-      documentType, 
-      status, 
-      remarks, 
-      req.user.id, 
-      submission.vendor
-    );
+    try {
+      const vendor = await User.findById(submission.vendor);
+      const consultant = await User.findById(req.user.id);
+      const document = submission.documents[documentIndex];
+      
+      const notificationType = status === 'approved' ? 'document_approved' : 'document_rejected';
+      const notificationTitle = `Document ${status === 'approved' ? 'Approved' : 'Rejected'}`;
+      const notificationMessage = `Your document "${document.documentName || documentType}" has been ${status} by ${consultant?.name || 'Consultant'}${remarks ? '. Remarks: ' + remarks : ''}`;
+      
+      await Notification.create({
+        recipient: submission.vendor,
+        sender: req.user.id,
+        type: notificationType,
+        title: notificationTitle,
+        message: notificationMessage,
+        relatedDocument: submission._id,
+        priority: status === 'rejected' ? 'high' : 'medium'
+      });
+      
+      // Send real-time notification
+      webSocketService.sendToUser(submission.vendor.toString(), 'notification', {
+        type: 'notification',
+        data: {
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          documentName: document.documentName || documentType,
+          consultantName: consultant?.name || 'Consultant',
+          timestamp: new Date().toISOString(),
+          priority: status === 'rejected' ? 'high' : 'medium'
+        }
+      });
+      
+      console.log(`✅ Review notification sent to ${vendor?.name}: "${document.documentName || documentType}" ${status}`);
+    } catch (notificationError) {
+      console.error('Error creating review notification:', notificationError);
+    }
 
     // If all documents are reviewed, create completion notification for admins
     const allReviewed = submission.documents.every(doc => doc.status !== 'pending');
@@ -3059,13 +3094,49 @@ exports.updateIndividualDocumentStatus = async (req, res) => {
     // Create vendor notification and email on rejection or approval
     try {
       const vendorUser = await User.findById(submission.vendor);
-      if (vendorUser && vendorUser.email) {
-        if (status === 'rejected') {
+      const consultant = await User.findById(req.user.id);
+      const document = submission.documents[docIndex];
+      
+      if (vendorUser) {
+        // Create notification
+        const notificationType = status === 'approved' ? 'document_approved' : 'document_rejected';
+        const notificationTitle = `Document ${status === 'approved' ? 'Approved' : 'Rejected'}`;
+        const notificationMessage = `Your document "${document.documentName}" (${document.documentType}) has been ${status} by ${consultant?.name || 'Consultant'}${reviewNotes ? '. Remarks: ' + reviewNotes : ''}`;
+        
+        await Notification.create({
+          recipient: submission.vendor,
+          sender: req.user.id,
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          relatedDocument: submission._id,
+          priority: status === 'rejected' ? 'high' : 'medium'
+        });
+        
+        // Send real-time notification
+        webSocketService.sendToUser(submission.vendor.toString(), 'notification', {
+          type: 'notification',
+          data: {
+            type: notificationType,
+            title: notificationTitle,
+            message: notificationMessage,
+            documentName: document.documentName,
+            documentType: document.documentType,
+            consultantName: consultant?.name || 'Consultant',
+            timestamp: new Date().toISOString(),
+            priority: status === 'rejected' ? 'high' : 'medium'
+          }
+        });
+        
+        console.log(`✅ Notification sent to ${vendorUser.name}: "${document.documentName}" ${status}`);
+        
+        // Send email for rejection
+        if (status === 'rejected' && vendorUser.email) {
           await emailService.sendDocumentRejectionNotification(
             {
-              _id: submission.documents[docIndex]._id,
-              documentName: submission.documents[docIndex].documentName,
-              documentType: submission.documents[docIndex].documentType,
+              _id: document._id,
+              documentName: document.documentName,
+              documentType: document.documentType,
               reviewComments: reviewNotes || 'Document rejected',
               reviewDate: new Date(),
               status: 'rejected'
@@ -3076,7 +3147,7 @@ exports.updateIndividualDocumentStatus = async (req, res) => {
         }
       }
     } catch (notifyErr) {
-      console.error('Post-update email/notification error:', notifyErr);
+      console.error('Post-update notification error:', notifyErr);
     }
 
     // Save the submission
@@ -3150,51 +3221,7 @@ const createDocumentUploadNotification = async (submission, documentType, action
   }
 };
 
-// Helper function to create document review notifications (for vendors)
-const createDocumentReviewNotification = async (submission, documentType, action, remarks, consultantId, vendorId) => {
-  try {
-    // Find the consultant and vendor
-    const consultant = await User.findById(consultantId);
-    const vendor = await User.findById(vendorId);
-    
-    if (!vendor) {
-      console.error('Vendor not found');
-      return;
-    }
 
-    // Create notification for the vendor
-    const vendorNotification = await Notification.create({
-      recipient: vendorId,
-      sender: consultantId,
-      type: action === 'approved' ? 'document_approved' : 'document_rejected',
-      title: `Document ${action === 'approved' ? 'Approved' : 'Rejected'}`,
-      message: `Your ${getDocumentTypeLabel(documentType)} for ${submission.year}/${submission.month} has been ${action} by ${consultant.name}. ${remarks ? 'Remarks: ' + remarks : ''}`,
-      relatedDocument: submission._id,
-      priority: action === 'rejected' ? 'high' : 'medium'
-    });
-
-    // Send real-time notification to vendor
-    webSocketService.sendToUser(vendorId.toString(), 'notification', {
-      type: 'notification',
-      data: {
-        ...vendorNotification.toObject(),
-        relatedDocument: {
-          _id: submission._id,
-          title: `${submission.year}/${submission.month} - ${getDocumentTypeLabel(documentType)}`,
-          status: action,
-          consultantName: consultant.name,
-          documentType: getDocumentTypeLabel(documentType),
-          remarks: remarks || '',
-          reviewDate: new Date().toISOString()
-        }
-      }
-    });
-
-    console.log(`Notification sent to vendor ${vendor.name} for document ${action} by ${consultant.name}`);
-  } catch (error) {
-    console.error('Error creating document review notification:', error);
-  }
-};
 
 // Helper function to create completion/verification notifications (for admins)
 const createCompletionNotification = async (submission, consultantId, notificationType, message) => {
@@ -3548,6 +3575,127 @@ const getMonthName = (monthNumber) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months[monthNumber - 1] || 'Jan';
+};
+
+// @desc    Get documents by status (for frontend compatibility)
+// @route   GET /api/document-submissions/documents/status/:status
+// @access  Private
+exports.getDocumentsByStatus = async (req, res) => {
+  try {
+    const { status } = req.params;
+    const { page = 1, limit = 10, search = '', year, month } = req.query;
+    
+    console.log(`Fetching documents with status: ${status} from DocumentSubmission model`);
+    
+    // Build query for submissions
+    let submissionQuery = {};
+    
+    // For vendors, only show their own documents
+    if (req.user.role === 'vendor') {
+      submissionQuery.vendor = req.user.id;
+    }
+    
+    // Add year/month filters if provided
+    if (year) {
+      submissionQuery['uploadPeriod.year'] = parseInt(year);
+    }
+    if (month && month !== 'All') {
+      // Convert month number to month name if needed
+      let monthName = month;
+      if (!isNaN(parseInt(month))) {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIndex = parseInt(month) - 1;
+        if (monthIndex >= 0 && monthIndex <= 11) {
+          monthName = monthNames[monthIndex];
+        }
+      }
+      submissionQuery['uploadPeriod.month'] = monthName;
+    }
+    
+    console.log('Submission query:', submissionQuery);
+    
+    // Find submissions and extract documents with the specified status
+    const submissions = await DocumentSubmission.find(submissionQuery)
+      .populate('vendor', 'name email company')
+      .populate('consultant', 'name email')
+      .sort({ createdAt: -1 });
+    
+    console.log(`Found ${submissions.length} submissions`);
+    
+    // Extract documents with the specified status
+    let matchingDocuments = [];
+    
+    submissions.forEach(submission => {
+      submission.documents.forEach(doc => {
+        if (doc.status === status) {
+          // Apply search filter if provided
+          if (search) {
+            const searchLower = search.toLowerCase();
+            const matchesSearch = 
+              doc.documentName?.toLowerCase().includes(searchLower) ||
+              doc.documentType?.toLowerCase().includes(searchLower) ||
+              submission.vendor?.name?.toLowerCase().includes(searchLower) ||
+              submission.vendor?.company?.toLowerCase().includes(searchLower);
+            
+            if (!matchesSearch) {
+              return; // Skip this document
+            }
+          }
+          
+          // Format document for frontend compatibility
+          matchingDocuments.push({
+            _id: doc._id,
+            title: doc.documentName || doc.documentType,
+            documentType: doc.documentType,
+            status: doc.status,
+            createdAt: doc.uploadDate || submission.createdAt,
+            submissionDate: submission.submissionDate || submission.createdAt,
+            reviewDate: doc.reviewDate,
+            reviewNotes: doc.consultantRemarks,
+            files: [{
+              _id: doc._id,
+              originalName: doc.documentName || doc.fileName,
+              mimeType: doc.fileType || 'application/pdf'
+            }],
+            vendor: submission.vendor,
+            reviewer: doc.reviewedBy ? {
+              _id: doc.reviewedBy,
+              name: submission.consultant?.name || 'Unknown',
+              email: submission.consultant?.email || ''
+            } : null,
+            // Additional fields for compatibility
+            submissionId: submission.submissionId,
+            uploadPeriod: submission.uploadPeriod
+          });
+        }
+      });
+    });
+    
+    console.log(`Found ${matchingDocuments.length} documents with status: ${status}`);
+    
+    // Apply pagination
+    const total = matchingDocuments.length;
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedDocuments = matchingDocuments.slice(startIndex, endIndex);
+    
+    res.status(200).json({
+      success: true,
+      count: paginatedDocuments.length,
+      total,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      page: parseInt(page),
+      data: paginatedDocuments
+    });
+  } catch (error) {
+    console.error(`Error getting documents with status ${req.params.status}:`, error);
+    res.status(500).json({
+      success: false,
+      message: `Could not get documents with status ${req.params.status}`,
+      error: error.message
+    });
+  }
 };
 
 // Export notification functions for use in other controllers

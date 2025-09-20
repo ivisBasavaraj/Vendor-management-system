@@ -34,6 +34,9 @@ router.get('/consultant/submissions', protect, authorize('consultant', 'admin'),
 // Get submissions by status
 router.get('/status/:status', protect, authorize('consultant', 'admin'), documentSubmissionController.getSubmissionsByStatus);
 
+// Get documents by status (for frontend compatibility)
+router.get('/documents/status/:status', protect, documentSubmissionController.getDocumentsByStatus);
+
 // Review document
 router.post('/:submissionId/review/:documentType', protect, authorize('consultant', 'admin'), documentSubmissionController.reviewDocument);
 

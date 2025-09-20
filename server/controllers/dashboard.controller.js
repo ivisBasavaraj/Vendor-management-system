@@ -120,75 +120,67 @@ exports.getVendorDashboard = async (req, res) => {
     const allDocuments = await Document.find({ vendor: vendorId }, 'status title');
     console.log('All documents for vendor:', allDocuments.map(doc => ({ title: doc.title, status: doc.status })));
     
-    // First try to get document counts from Document model
-    let totalDocuments = await Document.countDocuments({ vendor: vendorId });
-    let pendingDocuments = await Document.countDocuments({ 
-      vendor: vendorId, 
-      status: 'pending'
-    });
-    let underReviewDocuments = await Document.countDocuments({ 
-      vendor: vendorId, 
-      status: 'under_review'
-    });
-    let approvedDocuments = await Document.countDocuments({ 
-      vendor: vendorId, 
-      status: { $in: ['approved', 'consultant_approved', 'final_approved'] }
-    });
-    let rejectedDocuments = await Document.countDocuments({ 
-      vendor: vendorId, 
-      status: { $in: ['rejected', 'consultant_rejected', 'final_rejected'] }
+    // Get submissions for this vendor (primary data source)
+    const submissions = await DocumentSubmission.find({ vendor: vendorId });
+    console.log(`Found ${submissions.length} document submissions`);
+
+    // Initialize counters
+    let totalDocuments = 0;
+    let pendingDocuments = 0;
+    let underReviewDocuments = 0;
+    let approvedDocuments = 0;
+    let rejectedDocuments = 0;
+    let resubmittedFromSubmissions = 0;
+    
+    // Count documents from submissions (primary source)
+    submissions.forEach(submission => {
+      submission.documents.forEach(doc => {
+        totalDocuments++;
+        console.log(`Document: ${doc.documentName}, Status: ${doc.status}`);
+        
+        switch (doc.status) {
+          case 'pending':
+          case 'uploaded': // Count uploaded as pending
+            pendingDocuments++;
+            break;
+          case 'under_review':
+            underReviewDocuments++;
+            break;
+          case 'approved':
+            approvedDocuments++;
+            break;
+          case 'rejected':
+            rejectedDocuments++;
+            console.log(`REJECTED DOCUMENT FOUND: ${doc.documentName}`);
+            break;
+          case 'resubmitted':
+            resubmittedFromSubmissions++;
+            break;
+        }
+      });
     });
     
-    // Initialize submission counters (used in both code paths)
-    let resubmittedFromSubmissions = 0;
-
-    // If no documents found in Document model, try DocumentSubmission model
+    // If no submissions found, try Document model as fallback
     if (totalDocuments === 0) {
-      console.log('No documents found in Document model, checking DocumentSubmission model');
-
-      // Get submissions for this vendor
-      const submissions = await DocumentSubmission.find({ vendor: vendorId });
-      console.log(`Found ${submissions.length} document submissions`);
-
-      // Count documents from submissions
-      let totalFromSubmissions = 0;
-      let pendingFromSubmissions = 0;
-      let underReviewFromSubmissions = 0;
-      let approvedFromSubmissions = 0;
-      let rejectedFromSubmissions = 0;
+      console.log('No documents found in DocumentSubmission model, checking Document model');
       
-      submissions.forEach(submission => {
-        submission.documents.forEach(doc => {
-          totalFromSubmissions++;
-          switch (doc.status) {
-            case 'pending':
-            case 'uploaded': // Count uploaded as pending
-              pendingFromSubmissions++;
-              break;
-            case 'under_review':
-              underReviewFromSubmissions++;
-              break;
-            case 'approved':
-              approvedFromSubmissions++;
-              break;
-            case 'rejected':
-              rejectedFromSubmissions++;
-              break;
-            case 'resubmitted':
-              resubmittedFromSubmissions++;
-              break;
-          }
-        });
+      totalDocuments = await Document.countDocuments({ vendor: vendorId });
+      pendingDocuments = await Document.countDocuments({ 
+        vendor: vendorId, 
+        status: 'pending'
       });
-      
-      // Use counts from submissions if available
-      if (totalFromSubmissions > 0) {
-        totalDocuments = totalFromSubmissions;
-        pendingDocuments = pendingFromSubmissions;
-        underReviewDocuments = underReviewFromSubmissions;
-        approvedDocuments = approvedFromSubmissions;
-        rejectedDocuments = rejectedFromSubmissions;
-      }
+      underReviewDocuments = await Document.countDocuments({ 
+        vendor: vendorId, 
+        status: 'under_review'
+      });
+      approvedDocuments = await Document.countDocuments({ 
+        vendor: vendorId, 
+        status: { $in: ['approved', 'consultant_approved', 'final_approved'] }
+      });
+      rejectedDocuments = await Document.countDocuments({ 
+        vendor: vendorId, 
+        status: { $in: ['rejected', 'consultant_rejected', 'final_rejected'] }
+      });
     }
     
     console.log('Document counts:', {
@@ -280,9 +272,138 @@ exports.getVendorDashboard = async (req, res) => {
       }
     }
     
+    // Get current period info
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.toLocaleString('default', { month: 'short' });
+    
+    // Get vendor info
+    const vendorInfo = await User.findById(vendorId).select('name email company');
+    
+    // Get rejected documents details
+    const rejectedDocumentsList = [];
+    const submissions = await DocumentSubmission.find({ vendor: vendorId });
+    
+    submissions.forEach(submission => {
+      submission.documents.forEach(doc => {
+        if (doc.status === 'rejected' || doc.consultantStatus === 'rejected') {
+          rejectedDocumentsList.push({
+            submissionId: submission._id,
+            submissionPeriod: {
+              year: submission.year || currentYear,
+              month: submission.month || currentMonth
+            },
+            documentType: doc.documentType,
+            documentName: doc.documentName || doc.documentType,
+            rejectionReason: doc.consultantRemarks || doc.remarks || 'No reason provided',
+            rejectedDate: doc.reviewDate || doc.updatedAt || submission.updatedAt,
+            reviewedBy: submission.consultant
+          });
+        }
+      });
+    });
+    
+    // Calculate submission stats
+    const submissionStats = {
+      totalSubmissions: submissions.length,
+      draft: 0,
+      submitted: 0,
+      underReview: 0,
+      partiallyApproved: 0,
+      fullyApproved: 0,
+      requiresResubmission: 0
+    };
+    
+    submissions.forEach(submission => {
+      switch (submission.status) {
+        case 'draft':
+          submissionStats.draft++;
+          break;
+        case 'submitted':
+          submissionStats.submitted++;
+          break;
+        case 'under_review':
+          submissionStats.underReview++;
+          break;
+        case 'partially_approved':
+          submissionStats.partiallyApproved++;
+          break;
+        case 'fully_approved':
+          submissionStats.fullyApproved++;
+          break;
+        case 'requires_resubmission':
+          submissionStats.requiresResubmission++;
+          break;
+      }
+    });
+    
+    // Get current submission if exists
+    const currentSubmission = submissions.find(sub => 
+      (sub.year === currentYear || !sub.year) && 
+      (sub.month === currentMonth || !sub.month)
+    );
+    
+    // Calculate compliance status
+    const totalRequiredDocuments = 15; // Adjust based on your requirements
+    const complianceRate = totalDocuments > 0 ? Math.round((approvedDocuments / totalRequiredDocuments) * 100) : 0;
+    const currentPeriodCompliant = currentSubmission ? 
+      currentSubmission.status === 'fully_approved' : false;
+    
+    // Calculate pending actions
+    const pendingActions = rejectedDocuments + (currentSubmission && 
+      currentSubmission.status === 'requires_resubmission' ? 1 : 0);
+    
+    // Get submission history
+    const submissionHistory = submissions.map(sub => ({
+      _id: {
+        year: sub.year || currentYear,
+        month: sub.month || currentMonth
+      },
+      status: sub.status || 'draft',
+      submissionDate: sub.submissionDate || sub.createdAt
+    }));
+    
+    // Calculate next deadline (15th of next month)
+    const nextDeadline = new Date(currentYear, currentDate.getMonth() + 1, 15);
+    
     res.status(200).json({
       success: true,
       data: {
+        vendorInfo: {
+          name: vendorInfo?.name || 'Unknown Vendor',
+          email: vendorInfo?.email || '',
+          company: vendorInfo?.company || ''
+        },
+        currentPeriod: {
+          year: currentYear,
+          month: currentMonth
+        },
+        currentSubmission: currentSubmission ? {
+          submissionId: currentSubmission._id,
+          submissionStatus: currentSubmission.status || 'draft'
+        } : null,
+        submissionStats,
+        documentStatusBreakdown: {
+          total: totalDocuments,
+          uploaded: pendingDocuments,
+          underReview: underReviewDocuments,
+          approved: approvedDocuments,
+          rejected: rejectedDocuments,
+          resubmitted: resubmittedFromSubmissions || 0
+        },
+        rejectedDocuments: rejectedDocumentsList,
+        complianceStatus: {
+          currentPeriodCompliant,
+          overallComplianceRate: complianceRate,
+          pendingActions,
+          lastSubmissionDate: submissions.length > 0 ? 
+            submissions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0].createdAt :
+            null
+        },
+        recentNotifications: [],
+        submissionHistory,
+        nextDeadline: nextDeadline.toISOString(),
+        // Legacy fields for backward compatibility
         documentStats: {
           totalDocuments,
           pendingDocuments,

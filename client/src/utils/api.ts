@@ -330,10 +330,10 @@ const apiService = {
     
     getByStatus: (status: string, params?: any) => {
       console.log(`Fetching documents with status: ${status}, params:`, params);
-      // Try to get documents from the document-submissions API first
-      return api.get(`${API_PREFIX}/document-submissions/status/${status}`, { params })
+      // Try to get documents from the document-submissions API first (new endpoint for documents by status)
+      return api.get(`${API_PREFIX}/document-submissions/documents/status/${status}`, { params })
         .catch(error => {
-          console.log(`Error fetching from document-submissions API: ${error}. Trying legacy endpoint...`);
+          console.log(`Error fetching from document-submissions documents API: ${error}. Trying legacy endpoint...`);
           // Fall back to legacy documents API if the new endpoint fails
           return api.get(`${API_PREFIX}/documents/status/${status}`, { params });
         });
