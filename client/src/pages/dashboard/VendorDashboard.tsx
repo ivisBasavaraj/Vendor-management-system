@@ -232,9 +232,9 @@ const VendorDashboard: React.FC = () => {
           </motion.div>
           
           <motion.div variants={fadeInUp}>
-            <Card
+            <Card 
               className="cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20"
-              onClick={() => handleCardClick('/documents/rejected')}
+              onClick={() => handleCardClick('/documents/edit')}
             >
               <div className="flex items-center">
                 <div className="rounded-full bg-red-100 dark:bg-red-900 p-3 mr-4">
