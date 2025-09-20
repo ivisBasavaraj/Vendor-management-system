@@ -30,7 +30,7 @@ import UploadDocumentPage from './pages/documents/UploadDocumentPage';
 import DocumentListPage from './pages/documents/DocumentListPage';
 import DocumentReviewPage from './pages/documents/DocumentReviewPage';
 import DocumentViewPage from './pages/documents/DocumentViewPage';
-import RejectedDocumentsPage from './pages/documents/RejectedDocumentsPage';
+
 
 // Vendor Pages
 import DocumentSubmissionPage from './pages/vendor/DocumentSubmissionPage';
@@ -387,13 +387,7 @@ const AppContent: React.FC = () => {
             </AnimatedPage>
           </RoleRoute>
         } />
-        <Route path="/documents/rejected" element={
-          <RoleRoute allowedRoles={['vendor']}>
-            <AnimatedPage>
-              <RejectedDocumentsPage />
-            </AnimatedPage>
-          </RoleRoute>
-        } />
+
         <Route path="/documents/resubmit/:id" element={
           <RoleRoute allowedRoles={['vendor']}>
             <AnimatedPage>
