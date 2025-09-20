@@ -1483,7 +1483,7 @@ exports.updateDocumentStatus = async (req, res) => {
     try {
       const notificationType = status === 'approved' ? 'document_approved' : 'document_rejected';
       const notificationTitle = status === 'approved' ? 'Document Approved' : 'Document Rejected';
-      const notificationMessage = `Your ${document.documentType} has been ${status}${remarks ? '. Remarks: ' + remarks : ''}`;
+      const notificationMessage = `Your document "${document.documentName}" (${document.documentType}) has been ${status}${remarks ? '. Remarks: ' + remarks : ''}`;
       
       await Notification.create({
         recipient: submission.vendor,

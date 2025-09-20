@@ -97,14 +97,7 @@ async function debugDocuments() {
   }
 }
 
-debugDocuments();const mongoose = require('mongoose');
-require('dotenv').config();
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/vendor-management', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+debugDocuments();
 
 const User = require('./models/user.model');
 const Document = require('./models/document.model');

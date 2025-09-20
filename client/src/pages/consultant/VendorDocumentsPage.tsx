@@ -724,6 +724,11 @@ const VendorDocumentsPage: React.FC = () => {
       const approvedDocuments = filteredDocuments.filter(doc => doc.status === 'approved').length;
       const rejectedDocuments = filteredDocuments.filter(doc => doc.status === 'rejected').length;
       const pendingDocuments = filteredDocuments.filter(doc => doc.status === 'pending' || doc.status === 'under_review').length;
+
+      // Prevent report generation if any documents are rejected
+      if (rejectedDocuments > 0) {
+        throw new Error(`Cannot generate compliance verification report. This submission contains ${rejectedDocuments} rejected document(s). All documents must be approved to generate the report.`);
+      }
       
       // Calculate compliance rate based on approved + rejected (processed documents)
       const processedDocuments = approvedDocuments + rejectedDocuments;
