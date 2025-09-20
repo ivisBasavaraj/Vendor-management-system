@@ -3699,5 +3699,4 @@ exports.getDocumentsByStatus = async (req, res) => {
 };
 
 // Export notification functions for use in other controllers
-module.exports.createDocumentReviewNotification = createDocumentReviewNotification;
 module.exports.createCompletionNotification = createCompletionNotification;
