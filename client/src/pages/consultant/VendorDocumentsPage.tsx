@@ -1251,37 +1251,18 @@ const VendorDocumentsPage: React.FC = () => {
                           ))}
                         </div>
                         
-                        {/* Report Buttons - Show when documents are processed (approved or rejected) */}
-                        {(areAllDocumentsApproved(submission) || submission.documents.some(doc => doc.status === 'rejected')) && (
-                          <div className={`mt-8 pt-6 border-t border-gray-200 dark:border-gray-600 rounded-lg p-6 ${
-                            areAllDocumentsApproved(submission) 
-                              ? 'bg-green-50 dark:bg-green-900' 
-                              : 'bg-blue-50 dark:bg-blue-900'
-                          }`}>
+                        {/* Report Buttons - Show only when all documents are approved */}
+                        {areAllDocumentsApproved(submission) && (
+                          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-green-50 dark:bg-green-900">
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                               <div className="flex items-center space-x-3">
-                                {areAllDocumentsApproved(submission) ? (
-                                  <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0" />
-                                ) : (
-                                  <ExclamationTriangleIcon className="h-6 w-6 text-blue-500 flex-shrink-0" />
-                                )}
+                                <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0" />
                                 <div>
-                                  <p className={`text-lg font-semibold ${
-                                    areAllDocumentsApproved(submission)
-                                      ? 'text-green-700 dark:text-green-300'
-                                      : 'text-blue-700 dark:text-blue-300'
-                                  }`}>
-                                    {areAllDocumentsApproved(submission) 
-                                      ? 'All Documents Approved! 🎉'
-                                      : 'Documents Processed - Report Available 📋'
-                                    }
+                                  <p className="text-lg font-semibold text-green-700 dark:text-green-300">
+                                    All Documents Approved! 🎉
                                   </p>
-                                  <p className={`text-sm ${
-                                    areAllDocumentsApproved(submission)
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-blue-600 dark:text-blue-400'
-                                  }`}>
-                                    {filterOutComplianceCertificates(submission.documents).length} document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''} processed - compliance report can be generated
+                                  <p className="text-sm text-green-600 dark:text-green-400">
+                                    {filterOutComplianceCertificates(submission.documents).length} document{filterOutComplianceCertificates(submission.documents).length !== 1 ? 's' : ''} approved - compliance report can be generated
                                   </p>
                                 </div>
                               </div>
